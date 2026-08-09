@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 
 type Tab = "orders" | "production" | "delivery" | "payment";
+type Section = "sales" | "customers";
 type Stage = "production" | "delivery" | "payment";
 type Order = {
   id: number;
@@ -25,6 +26,25 @@ type Order = {
 };
 
 const initialOrders: Order[] = [
+  {
+    id: 119,
+    code: "119-218",
+    receivedAt: "28/07/2026",
+    customer: "Nguyễn Văn Hữu",
+    phone: "0908 451 218",
+    address: "Châu Thành, Tiền Giang",
+    netInfo: "Lưới 5 phân cước 15 cao 3m, màn 2 tấc, phao nhựa, chì nặng 2kg",
+    quantity: 1,
+    unitPrice: 1680000,
+    total: 1680000,
+    actual: 1580000,
+    note: "Đơn cũ đã đối soát",
+    stage: "payment",
+    deliveryStatus: "Đã giao",
+    paymentStatus: "Đã nhận tiền",
+    paymentDate: "03/08/2026",
+    workers: { gather: "Út", lead: "Minh", float: "Sáu" },
+  },
   {
     id: 126,
     code: "126-218",
@@ -115,32 +135,53 @@ const splitNet = (value: string) => {
 };
 
 export default function Home() {
+  const [activeSection, setActiveSection] = useState<Section>("sales");
   const [activeTab, setActiveTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<"order" | "workers" | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
   const [toast, setToast] = useState("");
 
   const currentOrder = orders.find((order) => order.id === editingId);
   const counts = {
     orders: orders.length,
     production: orders.filter((order) => order.stage === "production").length,
-    delivery: orders.filter((order) => order.stage === "delivery").length,
+    delivery: orders.filter((order) => order.stage !== "production").length,
     payment: orders.filter((order) => order.stage === "payment").length,
   };
 
   const visibleOrders = useMemo(() => {
     const keyword = search.toLowerCase().trim();
-    return orders.filter((order) => {
+    const filtered = orders.filter((order) => {
       const inTab =
         activeTab === "orders" ||
         (activeTab === "production" && order.stage === "production") ||
-        (activeTab === "delivery" && order.stage === "delivery") ||
+        (activeTab === "delivery" && order.stage !== "production") ||
         (activeTab === "payment" && order.stage === "payment");
-      return inTab && (!keyword || `${order.code} ${order.customer} ${order.phone}`.toLowerCase().includes(keyword));
+      return inTab && (!keyword || `${order.code} ${order.customer} ${order.phone} ${order.note}`.toLowerCase().includes(keyword));
+    });
+    return filtered.sort((a, b) => {
+      if (activeTab === "orders" || activeTab === "production") return b.id - a.id;
+      if (activeTab === "delivery") {
+        if (a.deliveryStatus !== b.deliveryStatus) return a.deliveryStatus === "Chưa giao" ? -1 : 1;
+        return b.id - a.id;
+      }
+      if (a.paymentStatus !== b.paymentStatus) return a.paymentStatus === "Chưa nhận tiền" ? -1 : 1;
+      return a.id - b.id;
     });
   }, [activeTab, orders, search]);
+
+  const customers = useMemo(() => {
+    const byPhone = new Map<string, { phone: string; name: string; address: string; orders: Order[] }>();
+    [...orders].sort((a, b) => b.id - a.id).forEach((order) => {
+      const current = byPhone.get(order.phone);
+      if (current) current.orders.push(order);
+      else byPhone.set(order.phone, { phone: order.phone, name: order.customer, address: order.address, orders: [order] });
+    });
+    return [...byPhone.values()].sort((a, b) => b.orders[0].id - a.orders[0].id);
+  }, [orders]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -152,13 +193,16 @@ export default function Home() {
     notify("Đã chuyển đơn sang Đang Giao Hàng");
   };
 
-  const markDelivered = (id: number) => {
+  const toggleDelivered = (id: number) => {
     setOrders((items) =>
-      items.map((item) =>
-        item.id === id ? { ...item, stage: "payment", deliveryStatus: "Đã giao" } : item,
-      ),
+      items.map((item) => {
+        if (item.id !== id) return item;
+        const delivered = item.deliveryStatus === "Đã giao";
+        return { ...item, stage: delivered ? "delivery" : "payment", deliveryStatus: delivered ? "Chưa giao" : "Đã giao" };
+      }),
     );
-    notify("Đã giao hàng — đơn đã chuyển sang Nhận Tiền");
+    const wasDelivered = orders.find((item) => item.id === id)?.deliveryStatus === "Đã giao";
+    notify(wasDelivered ? "Đã chuyển đơn về trạng thái Chưa giao" : "Đã giao hàng — đơn đã xuất hiện ở Nhận Tiền");
   };
 
   const togglePaid = (id: number) => {
@@ -191,53 +235,54 @@ export default function Home() {
           <span className="brand-mark">L</span>
           <div><strong>LướiFlow</strong><small>Quản lý sản xuất</small></div>
         </div>
-        <nav className="tabs" aria-label="Các khu vực chính">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              className={activeTab === tab.key ? "tab active" : "tab"}
-              onClick={() => { setActiveTab(tab.key); setSearch(""); }}
-            >
-              <span className="tab-short">{tab.short}</span>
-              <span>{tab.label}</span>
-              <em>{counts[tab.key]}</em>
-            </button>
-          ))}
+        <nav className="parent-tabs" aria-label="Nhóm chức năng chính">
+          <button className={activeSection === "sales" ? "parent-tab active" : "parent-tab"} onClick={() => setActiveSection("sales")}><span>▦</span> Quản lý bán hàng</button>
+          <button className={activeSection === "customers" ? "parent-tab active" : "parent-tab"} onClick={() => { setActiveSection("customers"); setSearch(""); }}><span>◎</span> Quản lý khách hàng</button>
         </nav>
         <div className="user-chip"><span>NG</span><div><strong>Nguyễn Giang</strong><small>Quản lý</small></div></div>
       </header>
 
+      {activeSection === "sales" && <nav className="sales-tabs" aria-label="Các tab quản lý bán hàng">
+        <div>{tabs.map((tab) => (
+          <button key={tab.key} className={activeTab === tab.key ? "tab active" : "tab"} onClick={() => { setActiveTab(tab.key); setSearch(""); }}>
+            <span className="tab-short">{tab.short}</span><span>{tab.label}</span><em>{counts[tab.key]}</em>
+          </button>
+        ))}</div>
+      </nav>}
+
       <section className="workspace">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">QUẢN LÝ VẬN HÀNH</p>
-            <h1>{tabs.find((tab) => tab.key === activeTab)?.label}</h1>
-            <p>{subtitle(activeTab)}</p>
+            <p className="eyebrow">{activeSection === "sales" ? "QUẢN LÝ BÁN HÀNG" : "QUẢN LÝ KHÁCH HÀNG"}</p>
+            <h1>{activeSection === "sales" ? tabs.find((tab) => tab.key === activeTab)?.label : "Khách Hàng"}</h1>
+            <p>{activeSection === "sales" ? subtitle(activeTab) : "Mỗi số điện thoại là một khách hàng; xem đầy đủ đơn hiện tại và quá khứ."}</p>
           </div>
-          {activeTab === "orders" && (
+          {activeSection === "sales" && activeTab === "orders" && (
             <button className="primary" onClick={() => { setEditingId(null); setModal("order"); }}>
               <span>＋</span> Tạo đơn hàng
             </button>
           )}
         </div>
 
-        <div className="summary-row">
+        {activeSection === "sales" ? <div className="summary-row">
           <Summary label="Tổng đơn" value={orders.length} tone="ink" />
           <Summary label="Đang sản xuất" value={counts.production} tone="amber" />
-          <Summary label="Đang giao" value={counts.delivery} tone="blue" />
+          <Summary label="Chưa giao" value={orders.filter((o) => o.stage !== "production" && o.deliveryStatus === "Chưa giao").length} tone="blue" />
           <Summary label="Chờ nhận tiền" value={orders.filter((o) => o.stage === "payment" && o.paymentStatus === "Chưa nhận tiền").length} tone="green" />
-        </div>
+        </div> : <div className="customer-summary"><div><span>Khách hàng</span><strong>{customers.length}</strong></div><p>Nhận diện bằng số điện thoại · Lịch sử đơn được giữ xuyên suốt</p></div>}
 
         <section className="data-card">
           <div className="table-tools">
             <div className="search-box"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã đơn, khách hàng, số điện thoại..." /></div>
-            <div className="sync-note"><span>●</span> Dữ liệu đồng bộ từ Đơn Hàng</div>
+            <div className="sync-note"><span>●</span> {activeSection === "sales" ? "Dữ liệu đồng bộ từ Đơn Hàng" : "Khách hàng được nhóm theo số điện thoại"}</div>
           </div>
 
-          {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} />}
-          {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} />}
-          {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onDelivered={markDelivered} />}
-          {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} />}
+          {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => !search.trim() || `${customer.name} ${customer.phone}`.toLowerCase().includes(search.toLowerCase()))} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} /> : <>
+            {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} />}
+            {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} />}
+            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} />}
+            {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} />}
+          </>}
         </section>
       </section>
 
@@ -286,11 +331,11 @@ function Empty() {
 
 function OrdersTable({ orders, onEdit }: { orders: Order[]; onEdit: (id: number) => void }) {
   if (!orders.length) return <Empty />;
-  return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Thông tin lưới</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th>Vị trí</th><th></th></tr></thead><tbody>
+  return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Thông tin lưới</th><th>Ghi chú</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th>Vị trí</th><th></th></tr></thead><tbody>
     {orders.map((order) => <tr key={order.id}>
       <td><strong>{order.code}</strong><small>{order.receivedAt}</small></td>
       <td><strong>{order.customer}</strong><small>{order.phone}</small></td>
-      <td className="net-cell">{order.netInfo}</td><td className="num quantity">{order.quantity}</td>
+      <td className="net-cell">{order.netInfo}</td><td className="note-cell">{order.note || "—"}</td><td className="num quantity">{order.quantity}</td>
       <td className="num money">{money(order.total)}</td><td className={`num money ${order.actual === null ? "muted" : "actual"}`}>{money(order.actual)}</td>
       <td><StageBadge stage={order.stage} /></td><td><button className="link-btn" onClick={() => onEdit(order.id)}>Sửa</button></td>
     </tr>)}
@@ -308,10 +353,10 @@ function ProductionTable({ orders, onEditWorkers, onMove }: { orders: Order[]; o
   </tbody></table></div>;
 }
 
-function DeliveryTable({ orders, onDelivered }: { orders: Order[]; onDelivered: (id: number) => void }) {
+function DeliveryTable({ orders, onToggle }: { orders: Order[]; onToggle: (id: number) => void }) {
   if (!orders.length) return <Empty />;
   return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-    {orders.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{order.receivedAt}</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td>{order.address}</td><td className="num quantity">{order.quantity}</td><td className="num money">{money(order.total)}</td><td><span className="badge waiting">Chưa giao</span></td><td><button className="compact-primary" onClick={() => onDelivered(order.id)}>Đánh dấu đã giao</button></td></tr>)}
+    {orders.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{order.receivedAt}</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td>{order.address}</td><td className="num quantity">{order.quantity}</td><td className="num money">{money(order.total)}</td><td><span className={order.deliveryStatus === "Đã giao" ? "badge delivered" : "badge waiting"}>{order.deliveryStatus}</span></td><td><button className={order.deliveryStatus === "Đã giao" ? "secondary compact" : "compact-primary"} onClick={() => onToggle(order.id)}>{order.deliveryStatus === "Đã giao" ? "Chuyển về Chưa giao" : "Đánh dấu đã giao"}</button></td></tr>)}
   </tbody></table></div>;
 }
 
@@ -320,6 +365,27 @@ function PaymentTable({ orders, onPaid, onEdit }: { orders: Order[]; onPaid: (id
   return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th>Chênh lệch</th><th>Nhận tiền</th><th></th></tr></thead><tbody>
     {orders.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>Đã giao</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td className="num money total-highlight">{money(order.total)}</td><td className={`num money ${order.actual === null ? "muted" : "actual-highlight"}`}>{money(order.actual)}</td><td className="money difference">{order.actual === null ? "—" : money(order.total - order.actual)}</td><td><span className={order.paymentStatus === "Đã nhận tiền" ? "badge paid" : "badge unpaid"}>{order.paymentStatus}</span>{order.paymentDate && <small>{order.paymentDate}</small>}</td><td><div className="row-actions">{order.actual === null && <button className="link-btn" onClick={() => onEdit(order.id)}>Nhập thực thu</button>}<button className="compact-primary" disabled={order.actual === null} onClick={() => onPaid(order.id)}>{order.paymentStatus === "Đã nhận tiền" ? "Hoàn tác" : "Đã nhận tiền"}</button></div></td></tr>)}
   </tbody></table></div>;
+}
+
+function CustomersView({ customers, selectedPhone, onSelect, onEditOrder }: { customers: { phone: string; name: string; address: string; orders: Order[] }[]; selectedPhone: string | null; onSelect: (phone: string) => void; onEditOrder: (id: number) => void }) {
+  if (!customers.length) return <Empty />;
+  const selected = customers.find((customer) => customer.phone === selectedPhone) || customers[0];
+  const historicalOrders = [...selected.orders].sort((a, b) => b.id - a.id);
+  return <div className="customer-layout">
+    <aside className="customer-list">
+      {customers.map((customer) => <button key={customer.phone} className={customer.phone === selected.phone ? "customer-item active" : "customer-item"} onClick={() => onSelect(customer.phone)}>
+        <span className="customer-avatar">{customer.name.split(" ").slice(-2).map((part) => part[0]).join("")}</span>
+        <span><strong>{customer.name}</strong><small>{customer.phone}</small></span><em>{customer.orders.length} đơn</em>
+      </button>)}
+    </aside>
+    <section className="customer-detail">
+      <div className="customer-detail-head"><div><p className="eyebrow">LỊCH SỬ KHÁCH HÀNG</p><h2>{selected.name}</h2><p>{selected.phone} · {selected.address}</p></div><div><span>Tổng số đơn</span><strong>{selected.orders.length}</strong></div></div>
+      <div className="history-list">{historicalOrders.map((order) => <article key={order.id} className="history-order">
+        <div><strong>{order.code}</strong><small>{order.receivedAt}</small></div>
+        <p>{order.netInfo}</p><span className="history-quantity">{order.quantity} lưới</span><strong className="history-money">{money(order.total)}</strong><StageBadge stage={order.stage} /><button className="link-btn" onClick={() => onEditOrder(order.id)}>Xem đơn</button>
+      </article>)}</div>
+    </section>
+  </div>;
 }
 
 function StageBadge({ stage }: { stage: Stage }) {
