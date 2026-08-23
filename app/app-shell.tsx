@@ -2,152 +2,21 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth/session";
+import type { Order, OrderFormFields, Stage } from "@/lib/order-types";
 
 type Tab = "orders" | "production" | "delivery" | "payment" | "canceled";
 type Section = "sales" | "customers" | "finance";
-type Stage = "production" | "delivery" | "payment" | "canceled";
-type Order = {
-  id: number;
-  code: string;
-  receivedAt: string;
-  createdAt: string;
-  customer: string;
-  phone: string;
-  address: string;
-  netInfo: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  actual: number | null;
-  note: string;
-  stage: Stage;
-  deliveryStatus: "Chưa giao" | "Đã giao";
-  paymentStatus: "Chưa nhận tiền" | "Đã nhận tiền";
-  paymentDate?: string;
-  canceledAt?: string;
-  cancelReason?: string;
-  workers: { gather: string; lead: string; float: string };
-};
 
-const initialOrders: Order[] = [
-  {
-    id: 119,
-    code: "119-218",
-    receivedAt: "28/07/2026",
-    createdAt: "2026-07-28T08:12:35",
-    customer: "Nguyễn Văn Hữu",
-    phone: "0908 451 218",
-    address: "Châu Thành, Tiền Giang",
-    netInfo: "Lưới 5 phân cước 15 cao 3m, màn 2 tấc, phao nhựa, chì nặng 2kg",
-    quantity: 1,
-    unitPrice: 1680000,
-    total: 1680000,
-    actual: 1580000,
-    note: "Đơn cũ đã đối soát",
-    stage: "payment",
-    deliveryStatus: "Đã giao",
-    paymentStatus: "Đã nhận tiền",
-    paymentDate: "2026-08-03T10:15:42",
-    workers: { gather: "Út", lead: "Minh", float: "Sáu" },
-  },
-  {
-    id: 126,
-    code: "126-218",
-    receivedAt: "08/08/2026",
-    createdAt: "2026-08-08T09:18:24",
-    customer: "Nguyễn Văn Hữu",
-    phone: "0908 451 218",
-    address: "Châu Thành, Tiền Giang",
-    netInfo: "Lưới 4 phân cước 12 cao 3m2, màn 2 tấc cước 35, phao nhựa đầu 90, chì nặng 2kg",
-    quantity: 2,
-    unitPrice: 1250000,
-    total: 2500000,
-    actual: 2350000,
-    note: "Giao về bến xe Tiền Giang",
-    stage: "payment",
-    deliveryStatus: "Đã giao",
-    paymentStatus: "Chưa nhận tiền",
-    workers: { gather: "Út, Thành", lead: "Minh", float: "Sáu" },
-  },
-  {
-    id: 127,
-    code: "127-804",
-    receivedAt: "08/08/2026",
-    createdAt: "2026-08-08T14:32:11",
-    customer: "Lê Minh Tâm",
-    phone: "0937 225 804",
-    address: "Cái Bè, Tiền Giang",
-    netInfo: "Lưới 5 phân cước 15, màn 3 tấc, phao xốp, chì 2.5kg",
-    quantity: 4,
-    unitPrice: 780000,
-    total: 3120000,
-    actual: 3000000,
-    note: "Gọi khách trước khi gửi",
-    stage: "delivery",
-    deliveryStatus: "Chưa giao",
-    paymentStatus: "Chưa nhận tiền",
-    workers: { gather: "Thành", lead: "Minh, Út", float: "Sáu" },
-  },
-  {
-    id: 128,
-    code: "128-511",
-    receivedAt: "09/08/2026",
-    createdAt: "2026-08-09T07:45:08",
-    customer: "Trần Thị Lan",
-    phone: "0913 770 511",
-    address: "Cao Lãnh, Đồng Tháp",
-    netInfo: "Lưới 3 phân cước 9, màn 2 tấc, phao nhựa, chì 1.8kg",
-    quantity: 1,
-    unitPrice: 1850000,
-    total: 1850000,
-    actual: null,
-    note: "Đơn cần gấp",
-    stage: "production",
-    deliveryStatus: "Chưa giao",
-    paymentStatus: "Chưa nhận tiền",
-    workers: { gather: "Út", lead: "", float: "" },
-  },
-  {
-    id: 129,
-    code: "129-322",
-    receivedAt: "09/08/2026",
-    createdAt: "2026-08-09T08:26:53",
-    customer: "Phạm Hoàng Nam",
-    phone: "0986 114 322",
-    address: "Bến Tre",
-    netInfo: "Lưới 6 phân cước 18, màn 3 tấc, phao xốp lớn, chì 3kg",
-    quantity: 3,
-    unitPrice: 960000,
-    total: 2880000,
-    actual: null,
-    note: "Khách tự nhận",
-    stage: "production",
-    deliveryStatus: "Chưa giao",
-    paymentStatus: "Chưa nhận tiền",
-    workers: { gather: "Tám", lead: "Năm", float: "" },
-  },
-  {
-    id: 118,
-    code: "118-670",
-    receivedAt: "25/07/2026",
-    createdAt: "2026-07-25T16:08:19",
-    customer: "Võ Văn Bình",
-    phone: "0974 330 670",
-    address: "Mỏ Cày, Bến Tre",
-    netInfo: "Lưới 4 phân cước 12, màn 2 tấc, phao nhựa, chì 2kg",
-    quantity: 2,
-    unitPrice: 920000,
-    total: 1840000,
-    actual: null,
-    note: "Khách đổi nhu cầu",
-    stage: "canceled",
-    deliveryStatus: "Chưa giao",
-    paymentStatus: "Chưa nhận tiền",
-    canceledAt: "2026-07-26T08:05:12",
-    cancelReason: "Khách yêu cầu hủy đơn",
-    workers: { gather: "", lead: "", float: "" },
-  },
-];
+async function callApi(url: string, method: string, body?: unknown): Promise<Order> {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = (await res.json()) as { order?: Order; error?: string };
+  if (!res.ok || !data.order) throw new Error(data.error || "Có lỗi xảy ra, vui lòng thử lại.");
+  return data.order;
+}
 
 const tabs: { key: Tab; label: string; short: string }[] = [
   { key: "orders", label: "Đơn Hàng", short: "ĐH" },
@@ -174,7 +43,7 @@ function initials(user: AuthUser) {
   return source.split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase() || "").join("") || "?";
 }
 
-export default function AppShell({ user }: { user: AuthUser }) {
+export default function AppShell({ user, initialOrders }: { user: AuthUser; initialOrders: Order[] }) {
   const [activeSection, setActiveSection] = useState<Section>("sales");
   const [activeTab, setActiveTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<Order[]>(initialOrders);
@@ -238,39 +107,53 @@ export default function AppShell({ user }: { user: AuthUser }) {
     window.setTimeout(() => setToast(""), 2400);
   };
 
-  const moveToDelivery = (id: number) => {
-    setOrders((items) => items.map((item) => (item.id === id ? { ...item, stage: "delivery" } : item)));
-    notify("Đã chuyển đơn sang Đang Giao Hàng");
+  const applyUpdate = (id: number, updated: Order) => {
+    setOrders((items) => items.map((item) => (item.id === id ? updated : item)));
   };
 
-  const toggleDelivered = (id: number) => {
-    setOrders((items) =>
-      items.map((item) => {
-        if (item.id !== id) return item;
-        const delivered = item.deliveryStatus === "Đã giao";
-        return { ...item, stage: delivered ? "delivery" : "payment", deliveryStatus: delivered ? "Chưa giao" : "Đã giao" };
-      }),
-    );
-    const wasDelivered = orders.find((item) => item.id === id)?.deliveryStatus === "Đã giao";
-    notify(wasDelivered ? "Đã chuyển đơn về trạng thái Chưa giao" : "Đã giao hàng — đơn đã xuất hiện ở Nhận Tiền");
+  const moveToDelivery = async (id: number) => {
+    try {
+      const updated = await callApi(`/api/orders/${id}`, "PATCH", { stage: "delivery" });
+      applyUpdate(id, updated);
+      notify("Đã chuyển đơn sang Đang Giao Hàng");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    }
   };
 
-  const togglePaid = (id: number) => {
-    setOrders((items) =>
-      items.map((item) => {
-        if (item.id !== id) return item;
-        if (item.actual === null) {
-          notify("Hãy nhập Thực thu ở tab Đơn Hàng trước");
-          return item;
-        }
-        const paid = item.paymentStatus === "Đã nhận tiền";
-        return {
-          ...item,
-          paymentStatus: paid ? "Chưa nhận tiền" : "Đã nhận tiền",
-          paymentDate: paid ? undefined : new Date().toISOString(),
-        };
-      }),
-    );
+  const toggleDelivered = async (id: number) => {
+    const order = orders.find((item) => item.id === id);
+    if (!order) return;
+    const delivered = order.deliveryStatus === "Đã giao";
+    try {
+      const updated = await callApi(`/api/orders/${id}`, "PATCH", {
+        stage: delivered ? "delivery" : "payment",
+        deliveryStatus: delivered ? "Chưa giao" : "Đã giao",
+      });
+      applyUpdate(id, updated);
+      notify(delivered ? "Đã chuyển đơn về trạng thái Chưa giao" : "Đã giao hàng — đơn đã xuất hiện ở Nhận Tiền");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    }
+  };
+
+  const togglePaid = async (id: number) => {
+    const order = orders.find((item) => item.id === id);
+    if (!order) return;
+    if (order.actual === null) {
+      notify("Hãy nhập Thực thu ở tab Đơn Hàng trước");
+      return;
+    }
+    const paid = order.paymentStatus === "Đã nhận tiền";
+    try {
+      const updated = await callApi(`/api/orders/${id}`, "PATCH", {
+        paymentStatus: paid ? "Chưa nhận tiền" : "Đã nhận tiền",
+        paymentDate: paid ? null : new Date().toISOString(),
+      });
+      applyUpdate(id, updated);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    }
   };
 
   const openEdit = (id: number) => {
@@ -278,13 +161,22 @@ export default function AppShell({ user }: { user: AuthUser }) {
     setModal("order");
   };
 
-  const cancelOrder = (id: number) => {
+  const cancelOrder = async (id: number) => {
     const order = orders.find((item) => item.id === id);
     if (!order || !window.confirm(`Hủy đơn ${order.code}? Đơn sẽ bị loại khỏi Sản Xuất, Giao Hàng và Nhận Tiền.`)) return;
     const reason = window.prompt("Nhập lý do hủy đơn:", "Khách yêu cầu hủy")?.trim();
     if (!reason) return;
-    setOrders((items) => items.map((item) => item.id === id ? { ...item, stage: "canceled", canceledAt: new Date().toISOString(), cancelReason: reason } : item));
-    notify("Đã chuyển đơn sang Đơn Hủy");
+    try {
+      const updated = await callApi(`/api/orders/${id}`, "PATCH", {
+        stage: "canceled",
+        canceledAt: new Date().toISOString(),
+        cancelReason: reason,
+      });
+      applyUpdate(id, updated);
+      notify("Đã chuyển đơn sang Đơn Hủy");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    }
   };
 
   const logout = async () => {
@@ -362,12 +254,22 @@ export default function AppShell({ user }: { user: AuthUser }) {
       {modal === "order" && (
         <OrderModal
           order={currentOrder}
-          nextId={Math.max(...orders.map((o) => o.id)) + 1}
           onClose={() => setModal(null)}
-          onSave={(saved) => {
-            setOrders((items) => currentOrder ? items.map((item) => item.id === saved.id ? saved : item) : [...items, saved]);
-            setModal(null);
-            notify(currentOrder ? "Đã cập nhật đơn và đồng bộ các tab" : "Đã tạo đơn và chuyển vào Sản Xuất");
+          onSave={async (fields) => {
+            try {
+              if (currentOrder) {
+                const updated = await callApi(`/api/orders/${currentOrder.id}`, "PATCH", fields);
+                applyUpdate(currentOrder.id, updated);
+                notify("Đã cập nhật đơn và đồng bộ các tab");
+              } else {
+                const created = await callApi("/api/orders", "POST", fields);
+                setOrders((items) => [created, ...items]);
+                notify("Đã tạo đơn và chuyển vào Sản Xuất");
+              }
+              setModal(null);
+            } catch (error) {
+              notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+            }
           }}
         />
       )}
@@ -375,10 +277,15 @@ export default function AppShell({ user }: { user: AuthUser }) {
         <WorkersModal
           order={currentOrder}
           onClose={() => setModal(null)}
-          onSave={(workers) => {
-            setOrders((items) => items.map((item) => item.id === currentOrder.id ? { ...item, workers } : item));
-            setModal(null);
-            notify("Đã cập nhật người tham gia");
+          onSave={async (workers) => {
+            try {
+              const updated = await callApi(`/api/orders/${currentOrder.id}`, "PATCH", { workers });
+              applyUpdate(currentOrder.id, updated);
+              setModal(null);
+              notify("Đã cập nhật người tham gia");
+            } catch (error) {
+              notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+            }
           }}
         />
       )}
@@ -421,6 +328,7 @@ function exportOrderPdf(order: Order) {
       <tr><th>Mã đơn</th><td>${order.code}</td></tr>
       <tr><th>Thông tin lưới</th><td>${order.netInfo}</td></tr>
       <tr><th>Số lượng</th><td>${order.quantity}</td></tr>
+      <tr><th>Ghi chú</th><td>${order.note || "—"}</td></tr>
     </table>
   </body></html>`);
   printWindow.document.close();
@@ -534,7 +442,7 @@ function Worker({ value }: { value: string }) {
   return value ? <span className="worker">{value}</span> : <span className="worker empty-worker">Chưa có</span>;
 }
 
-function OrderModal({ order, nextId, onClose, onSave }: { order?: Order; nextId: number; onClose: () => void; onSave: (order: Order) => void }) {
+function OrderModal({ order, onClose, onSave }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => void }) {
   const [form, setForm] = useState({
     customer: order?.customer || "",
     phone: order?.phone || "",
@@ -555,14 +463,7 @@ function OrderModal({ order, nextId, onClose, onSave }: { order?: Order; nextId:
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const id = order?.id || nextId;
-    const digits = form.phone.replace(/\D/g, "");
     onSave({
-      ...(order || { stage: "production", deliveryStatus: "Chưa giao", paymentStatus: "Chưa nhận tiền", workers: { gather: "", lead: "", float: "" } }),
-      id,
-      code: order?.code || `${id}-${digits.slice(-3) || "000"}`,
-      receivedAt: order?.receivedAt || "09/08/2026",
-      createdAt: order?.createdAt || new Date().toISOString(),
       customer: form.customer,
       phone: form.phone,
       address: form.address,

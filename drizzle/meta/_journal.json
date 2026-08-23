@@ -8,6 +8,13 @@
       "when": 1787449216796,
       "tag": "0000_shocking_skrulls",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787454811773,
+      "tag": "0001_exotic_manta",
+      "breakpoints": true
     }
   ]
 }

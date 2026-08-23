@@ -34,6 +34,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agent/skill tooling artifacts (not part of the app)
+/.agents/
+/.claude/
+skills-lock.json
+
 # typescript
 next-env.d.ts
 /dist/

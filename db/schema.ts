@@ -1,4 +1,4 @@
-import { bigint, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -22,4 +22,32 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Mỗi đơn hàng gắn với đúng 1 user (userId) — mỗi tài khoản chỉ thấy và
+// quản lý đơn hàng của chính mình, tách biệt hoàn toàn với tài khoản khác.
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  receivedAt: text("received_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  customer: text("customer").notNull(),
+  phone: text("phone").notNull(),
+  address: text("address").notNull().default(""),
+  netInfo: text("net_info").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: integer("unit_price").notNull(),
+  total: integer("total").notNull(),
+  actual: integer("actual"),
+  note: text("note").notNull().default(""),
+  stage: text("stage").notNull(), // production | delivery | payment | canceled
+  deliveryStatus: text("delivery_status").notNull(), // "Chưa giao" | "Đã giao"
+  paymentStatus: text("payment_status").notNull(), // "Chưa nhận tiền" | "Đã nhận tiền"
+  paymentDate: timestamp("payment_date", { withTimezone: true }),
+  canceledAt: timestamp("canceled_at", { withTimezone: true }),
+  cancelReason: text("cancel_reason"),
+  workerGather: text("worker_gather").notNull().default(""),
+  workerLead: text("worker_lead").notNull().default(""),
+  workerFloat: text("worker_float").notNull().default(""),
 });
