@@ -1,6 +1,7 @@
 import { getDb } from "@/db";
 import { orders } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
+import { ensureCustomerFromOrder } from "@/lib/customers";
 import { listOrders, toOrder } from "@/lib/orders";
 import type { OrderFormFields } from "@/lib/order-types";
 import { eq } from "drizzle-orm";
@@ -53,7 +54,11 @@ export async function POST(request: Request) {
     const code = `${inserted.id}-${digits.slice(-3) || "000"}`;
     const [order] = await db.update(orders).set({ code }).where(eq(orders.id, inserted.id)).returning();
 
-    return Response.json({ order: toOrder(order) });
+    // Chỉ tạo hồ sơ khách hàng nếu số điện thoại này chưa từng đặt hàng — thông
+    // tin khách hàng luôn giữ theo đơn đầu tiên, không bị đơn sau ghi đè.
+    const customer = await ensureCustomerFromOrder(user.id, body.phone, body.customer, body.address ?? "");
+
+    return Response.json({ order: toOrder(order), customer });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Tạo đơn hàng thất bại.";
     return Response.json({ error: message }, { status: 500 });

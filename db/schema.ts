@@ -1,4 +1,4 @@
-import { bigint, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -51,3 +51,19 @@ export const orders = pgTable("orders", {
   workerLead: text("worker_lead").notNull().default(""),
   workerFloat: text("worker_float").notNull().default(""),
 });
+
+// Thông tin khách hàng "gốc" — được tạo từ đơn hàng đầu tiên của một số điện
+// thoại và không bị đơn hàng sau ghi đè; chỉ thay đổi khi người dùng chủ động sửa.
+export const customers = pgTable(
+  "customers",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    name: text("name").notNull(),
+    address: text("address").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("customers_user_phone_unique").on(table.userId, table.phone)],
+);

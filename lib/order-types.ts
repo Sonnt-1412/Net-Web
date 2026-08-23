@@ -23,6 +23,12 @@ export type Order = {
   workers: { gather: string; lead: string; float: string };
 };
 
+export type Customer = {
+  phone: string;
+  name: string;
+  address: string;
+};
+
 export type OrderFormFields = {
   customer: string;
   phone: string;

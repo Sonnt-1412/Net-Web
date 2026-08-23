@@ -122,4 +122,12 @@ input,textarea { width:100%; padding:11px 12px; border:1px solid #d8ded9; border
 .auth-forgot-link:hover { text-decoration:underline; }
 .auth-notice { margin:0; padding:10px 12px; border-radius:8px; background:var(--green-soft); color:var(--green); font-size:12px; font-weight:600; line-height:1.5; word-break:break-word; }
 .logout-btn { margin-left:6px; }
+.select-col { width:38px; padding:15px 0 15px 16px; }
+.select-col input,.bulk-bar input[type="checkbox"] { width:16px; height:16px; accent-color:var(--green); }
+tr.row-selected { background:#f2f8f4; }
+.bulk-bar { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid var(--line); background:#eef6f0; }
+.bulk-bar>span { color:var(--green); font-size:12px; font-weight:800; }
+.bulk-bar>div { display:flex; align-items:center; gap:6px; }
+.customer-edit-btn { display:inline-block; margin-top:10px; padding:6px 0; }
+.lookup-hint { color:var(--muted); font-size:10px; font-weight:600; text-transform:none; letter-spacing:0; margin-left:6px; }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
