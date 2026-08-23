@@ -436,7 +436,6 @@ function orderSheetHtml(order: Order) {
     <h1>PHIẾU ĐƠN HÀNG</h1>
     <table>
       <tr><th>Mã đơn</th><td>${order.code}</td></tr>
-      <tr><th>Khách hàng</th><td>${order.customer} — ${order.phone}</td></tr>
       <tr><th>Ruột lưới</th><td>${parsed[0]}</td></tr>
       <tr><th>Màn</th><td>${parsed[1]}</td></tr>
       <tr><th>Phao</th><td>${parsed[2]}</td></tr>
