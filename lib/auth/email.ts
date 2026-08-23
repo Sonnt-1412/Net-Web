@@ -1,11 +1,9 @@
-import { env } from "cloudflare:workers";
-
-// Gửi email qua Resend (https://resend.com) bằng fetch thuần — không cần SDK,
-// chạy được trên Cloudflare Workers. Cần RESEND_API_KEY + RESEND_FROM_EMAIL.
+// Gửi email qua Resend (https://resend.com) bằng fetch thuần — không cần SDK.
+// Cần RESEND_API_KEY + RESEND_FROM_EMAIL.
 
 function getConfig() {
-  const apiKey = (env as Record<string, string | undefined>).RESEND_API_KEY;
-  const from = (env as Record<string, string | undefined>).RESEND_FROM_EMAIL;
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !from) return null;
   return { apiKey, from };
 }

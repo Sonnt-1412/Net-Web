@@ -1,5 +1,3 @@
-import { env } from "cloudflare:workers";
-
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
@@ -11,8 +9,8 @@ export type GoogleProfile = {
 };
 
 function getCredentials() {
-  const clientId = (env as Record<string, string | undefined>).GOOGLE_CLIENT_ID;
-  const clientSecret = (env as Record<string, string | undefined>).GOOGLE_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
   return { clientId, clientSecret };
 }
