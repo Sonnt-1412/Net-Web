@@ -320,6 +320,9 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
               <span>＋</span> Tạo đơn hàng
             </button>
           )}
+          {activeSection === "sales" && activeTab === "production" && (
+            <button className="secondary" onClick={() => exportOrdersExcel(visibleOrders)}>Xuất Excel</button>
+          )}
         </div>
 
         {activeSection === "finance" ? <FinanceView orders={orders} /> : <>{activeSection === "sales" ? <div className="summary-row">
@@ -482,29 +485,28 @@ function Empty() {
   return <div className="empty"><span>✓</span><strong>Không có đơn phù hợp</strong><p>Danh sách sẽ tự cập nhật khi trạng thái đơn thay đổi.</p></div>;
 }
 
+// Đơn có nhiều loại lưới → mỗi loại in trên 1 trang riêng, trang nào cũng giữ
+// nguyên thông tin chung của đơn (mã đơn, ghi chú) — không gộp chung 1 trang nữa.
 function orderSheetHtml(order: Order) {
   const items = allNetItems(order);
-  const compact = items.length > 2 ? " compact" : "";
-  const itemRows = items
-    .map((item, i) => {
+  return items
+    .map((item) => {
       const parsed = splitNet(item.netInfo);
-      const label = items.length > 1 ? `Loại lưới ${i + 1}` : "Ruột lưới";
-      return `<tr><th>${label}</th><td>${parsed[0]}</td></tr>
-      <tr><th>Màn</th><td>${parsed[1]}</td></tr>
-      <tr><th>Phao</th><td>${parsed[2]}</td></tr>
-      <tr><th>Chì</th><td>${parsed[3]}</td></tr>
-      <tr><th>Số lượng</th><td>${item.quantity}</td></tr>`;
-    })
-    .join("");
-  return `<section class="sheet${compact}">
+      return `<section class="sheet">
     <h1>PHIẾU ĐƠN HÀNG</h1>
     <p class="printed-at">Ngày in: ${formatDateTime(new Date().toISOString())}</p>
     <table>
       <tr><th>Mã đơn</th><td>${order.code}</td></tr>
-      ${itemRows}
+      <tr><th>Ruột lưới</th><td>${parsed[0]}</td></tr>
+      <tr><th>Màn</th><td>${parsed[1]}</td></tr>
+      <tr><th>Phao</th><td>${parsed[2]}</td></tr>
+      <tr><th>Chì</th><td>${parsed[3]}</td></tr>
+      <tr><th>Số lượng</th><td>${item.quantity}</td></tr>
       <tr><th>Ghi chú</th><td>${order.note || "—"}</td></tr>
     </table>
   </section>`;
+    })
+    .join("");
 }
 
 // Xuất một hoặc nhiều phiếu cùng lúc — mỗi phiếu là một trang in riêng, khổ A7.
@@ -522,9 +524,9 @@ function exportOrdersPdf(selectedOrders: Order[]) {
       h1 { font-size: 16px; margin: 0 0 4px; text-align: center; }
       .printed-at { margin: 0 0 8px; color: #555; font-size: 10px; text-align: center; }
       table { width: 100%; border-collapse: collapse; }
-      td, th { border: 1px solid #ccc; padding: 5px 7px; text-align: left; font-size: 13px; }
-      th { width: 42%; background: #f5f5f5; }
-      .sheet.compact td, .sheet.compact th { padding: 3px 5px; font-size: 10px; }
+      td, th { border: 1px solid #ccc; padding: 5px 7px; text-align: left; }
+      th { width: 38%; background: #f5f5f5; font-size: 11px; }
+      td { font-size: 17px; font-weight: 600; }
     </style>
   </head><body>${selectedOrders.map(orderSheetHtml).join("")}</body></html>`);
   printWindow.document.close();
@@ -568,6 +570,53 @@ function exportHandoverSheet(selectedOrders: Order[]) {
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();
+}
+
+function csvEscape(value: string) {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+// Xuất CSV (mở trực tiếp bằng Excel) — không dùng thư viện xlsx vì bản trên npm
+// đang dính lỗ hổng bảo mật chưa vá; CSV không cần thư viện ngoài mà vẫn mở tốt trong Excel.
+function exportOrdersExcel(selectedOrders: Order[]) {
+  if (!selectedOrders.length) return;
+  const headers = ["Mã đơn", "Ngày tạo", "Khách hàng", "SĐT", "Địa chỉ", "Thông tin lưới", "Tổng SL", "Thành tiền", "Thực thu", "Trạng thái", "Trạng thái giao hàng", "Trạng thái thanh toán", "Ngày nhận tiền", "Lượm lưới", "Dập chì", "Cột phao", "Ghi chú", "Lý do hủy"];
+  const rows = selectedOrders.map((order) => {
+    const items = allNetItems(order);
+    const netText = items.map((item) => `${item.netInfo} (SL ${item.quantity} × ${money(item.unitPrice)})`).join(" | ");
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    return [
+      order.code,
+      formatDateTime(order.createdAt),
+      order.customer,
+      order.phone,
+      order.address,
+      netText,
+      String(totalQuantity),
+      String(order.total),
+      order.actual === null ? "" : String(order.actual),
+      stageLabel(order.stage),
+      order.deliveryStatus,
+      order.paymentStatus,
+      order.paymentDate ? formatDateTime(order.paymentDate) : "",
+      order.workers.gather,
+      order.workers.lead,
+      order.workers.float,
+      order.note,
+      order.cancelReason || "",
+    ];
+  });
+  // BOM (﻿) để Excel nhận đúng bảng mã UTF-8, không lỗi font tiếng Việt.
+  const csv = "﻿" + [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `don-hang-san-xuat-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 // Cột "Khách hàng" dùng chung — SĐT hiển thị to/đậm vì đó là thứ cần tra cứu nhanh, tên nhỏ bên dưới.
@@ -703,16 +752,20 @@ function CustomersView({ customers, selectedPhone, onSelect, onEditOrder, onEdit
   </div>;
 }
 
+function stageLabel(stage: Stage) {
+  return stage === "production" ? "Sản xuất" : stage === "delivery" ? "Đang giao" : stage === "payment" ? "Nhận tiền" : "Đã hủy";
+}
+
 function StageBadge({ stage }: { stage: Stage }) {
-  const value = stage === "production" ? "Sản xuất" : stage === "delivery" ? "Đang giao" : stage === "payment" ? "Nhận tiền" : "Đã hủy";
-  return <span className={`badge ${stage}`}>{value}</span>;
+  return <span className={`badge ${stage}`}>{stageLabel(stage)}</span>;
 }
 
 function Worker({ value }: { value: string }) {
   return value ? <span className="worker">{value}</span> : <span className="worker empty-worker">Chưa có</span>;
 }
 
-function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => void; onLookupCustomer: (phone: string) => Promise<Customer | null> }) {
+function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => Promise<void>; onLookupCustomer: (phone: string) => Promise<Customer | null> }) {
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     customer: order?.customer || "",
     phone: order?.phone || "",
@@ -778,22 +831,28 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Orde
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.phone, order]);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    onSave({
-      customer: form.customer,
-      phone: form.phone,
-      address: form.address,
-      netInfo: form.netInfo,
-      quantity: Number(form.quantity),
-      unitPrice: Number(form.unitPrice),
-      total: Number(form.total),
-      actual: form.actual ? Number(form.actual) : null,
-      note: form.note,
-      extraItems: extraItems
-        .filter((item) => item.netInfo.trim())
-        .map((item) => ({ netInfo: item.netInfo.trim(), quantity: Number(item.quantity) || 1, unitPrice: Number(item.unitPrice) || 0 })),
-    });
+    if (submitting) return; // tránh bấm nhiều lần tạo trùng đơn khi đang chờ lưu
+    setSubmitting(true);
+    try {
+      await onSave({
+        customer: form.customer,
+        phone: form.phone,
+        address: form.address,
+        netInfo: form.netInfo,
+        quantity: Number(form.quantity),
+        unitPrice: Number(form.unitPrice),
+        total: Number(form.total),
+        actual: form.actual ? Number(form.actual) : null,
+        note: form.note,
+        extraItems: extraItems
+          .filter((item) => item.netInfo.trim())
+          .map((item) => ({ netInfo: item.netInfo.trim(), quantity: Number(item.quantity) || 1, unitPrice: Number(item.unitPrice) || 0 })),
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
   return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal" onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
     <div className="modal-head"><div><p className="eyebrow">ĐƠN HÀNG GỐC</p><h2>{order ? `Sửa đơn ${order.code}` : "Tạo đơn hàng mới"}</h2></div><button type="button" className="close" onClick={onClose}>×</button></div>
@@ -801,28 +860,39 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Orde
       <label>Số điện thoại<input required value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="Nhập số điện thoại trước để tự điền khách quen" /></label>
       <label>Khách hàng{lookingUp && <em className="lookup-hint"> đang tìm khách hàng…</em>}<input required value={form.customer} onChange={(e) => update("customer", e.target.value)} /></label>
       <label className="wide">Địa chỉ<input value={form.address} onChange={(e) => update("address", e.target.value)} /></label>
-      <label className="wide">Thông tin lưới chung<textarea required value={form.netInfo} onChange={(e) => update("netInfo", e.target.value)} placeholder="Ruột lưới, màn, phao, chì" /></label>
     </div>
-    <div className="parsed-grid">{["Ruột lưới", "Màn", "Phao", "Chì"].map((label, i) => <div key={label}><span>{label}</span><strong>{parsed[i]}</strong></div>)}</div>
+    {/* Mỗi loại lưới là 1 khối giống hệt nhau về bố cục (thông tin lưới + phân tách + SL/đơn giá),
+        xếp song song/nối tiếp nhau theo chiều dọc — loại lưới #1 bắt buộc, các loại sau tuỳ chọn. */}
+    <div className="net-items">
+      <div className="net-item-block">
+        <p className="eyebrow">LOẠI LƯỚI 1</p>
+        <label className="wide">Thông tin lưới<textarea required value={form.netInfo} onChange={(e) => update("netInfo", e.target.value)} placeholder="Ruột lưới, màn, phao, chì" /></label>
+        <div className="parsed-grid">{["Ruột lưới", "Màn", "Phao", "Chì"].map((label, i) => <div key={label}><span>{label}</span><strong>{parsed[i]}</strong></div>)}</div>
+        <div className="net-item-money">
+          <label>Số lượng<input type="number" min="1" required value={form.quantity} onChange={(e) => update("quantity", e.target.value)} /></label>
+          <label>Đơn giá<input inputMode="numeric" required value={formatMoneyInput(form.unitPrice)} onChange={(e) => update("unitPrice", digitsOnly(e.target.value))} /></label>
+        </div>
+      </div>
+      {extraItems.map((item, index) => {
+        const itemParsed = splitNet(item.netInfo);
+        return <div key={index} className="net-item-block">
+          <p className="eyebrow">LOẠI LƯỚI {index + 2}<button type="button" className="danger-link" onClick={() => removeExtraItem(index)}>Xoá</button></p>
+          <label className="wide">Thông tin lưới<textarea value={item.netInfo} onChange={(e) => updateExtraItem(index, "netInfo", e.target.value)} placeholder="Ruột lưới, màn, phao, chì" /></label>
+          <div className="parsed-grid">{["Ruột lưới", "Màn", "Phao", "Chì"].map((label, i) => <div key={label}><span>{label}</span><strong>{itemParsed[i]}</strong></div>)}</div>
+          <div className="net-item-money">
+            <label>Số lượng<input type="number" min="1" value={item.quantity} onChange={(e) => updateExtraItem(index, "quantity", e.target.value)} /></label>
+            <label>Đơn giá<input inputMode="numeric" value={formatMoneyInput(item.unitPrice)} onChange={(e) => updateExtraItem(index, "unitPrice", digitsOnly(e.target.value))} /></label>
+          </div>
+        </div>;
+      })}
+      <button type="button" className="link-btn" onClick={addExtraItem}>+ Thêm loại lưới</button>
+    </div>
     <div className="form-grid money-grid">
-      <label>Số lượng<input type="number" min="1" required value={form.quantity} onChange={(e) => update("quantity", e.target.value)} /></label>
-      <label>Đơn giá<input inputMode="numeric" required value={formatMoneyInput(form.unitPrice)} onChange={(e) => update("unitPrice", digitsOnly(e.target.value))} /></label>
       <label>Thành tiền<input inputMode="numeric" required value={formatMoneyInput(form.total)} onChange={(e) => { setManualTotal(true); update("total", digitsOnly(e.target.value)); }} /></label>
       <label>Thực thu<input inputMode="numeric" value={formatMoneyInput(form.actual)} onChange={(e) => update("actual", digitsOnly(e.target.value))} placeholder="Bỏ trống = mặc định 0đ" /></label>
       <label className="wide">Ghi chú<input value={form.note} onChange={(e) => update("note", e.target.value)} /></label>
     </div>
-    <div className="extra-items">
-      {extraItems.map((item, index) => (
-        <div key={index} className="extra-item-row">
-          <label className="wide">Loại lưới {index + 2}<input value={item.netInfo} onChange={(e) => updateExtraItem(index, "netInfo", e.target.value)} placeholder="Ruột lưới, màn, phao, chì" /></label>
-          <label>Số lượng<input type="number" min="1" value={item.quantity} onChange={(e) => updateExtraItem(index, "quantity", e.target.value)} /></label>
-          <label>Đơn giá<input inputMode="numeric" value={formatMoneyInput(item.unitPrice)} onChange={(e) => updateExtraItem(index, "unitPrice", digitsOnly(e.target.value))} /></label>
-          <button type="button" className="danger-link" onClick={() => removeExtraItem(index)}>Xoá</button>
-        </div>
-      ))}
-      <button type="button" className="link-btn" onClick={addExtraItem}>+ Thêm loại lưới</button>
-    </div>
-    <div className="modal-footer"><p><span>●</span> Thành tiền và Thực thu sẽ đồng bộ sang Nhận Tiền</p><div><button type="button" className="secondary" onClick={onClose}>Hủy</button><button className="primary">{order ? "Lưu thay đổi" : "Tạo đơn"}</button></div></div>
+    <div className="modal-footer"><p><span>●</span> Thành tiền và Thực thu sẽ đồng bộ sang Nhận Tiền</p><div><button type="button" className="secondary" onClick={onClose} disabled={submitting}>Hủy</button><button className="primary" disabled={submitting}>{submitting ? "Đang lưu…" : order ? "Lưu thay đổi" : "Tạo đơn"}</button></div></div>
   </form></div>;
 }
 
