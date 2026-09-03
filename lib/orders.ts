@@ -27,6 +27,7 @@ export function toOrder(row: OrderRow): Order {
     canceledAt: row.canceledAt ? row.canceledAt.toISOString() : undefined,
     cancelReason: row.cancelReason ?? undefined,
     workers: { gather: row.workerGather, lead: row.workerLead, float: row.workerFloat },
+    extraItems: row.extraItems ?? [],
   };
 }
 

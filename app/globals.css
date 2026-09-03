@@ -97,7 +97,7 @@ input,textarea { width:100%; padding:11px 12px; border:1px solid #d8ded9; border
 .modal-footer { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }.modal-footer p { margin:0; color:#77837f; font-size:10px; }.modal-footer p span { color:#39a574; }.modal-footer>div { display:flex; gap:8px; }.secondary { padding:12px 17px; border:1px solid #d7ddd8; border-radius:9px; background:#fff; color:#53615c; font-weight:700; }
 .worker-form { display:grid; gap:14px; margin:20px 0; }.toast { position:fixed; right:28px; bottom:28px; z-index:80; display:flex; align-items:center; gap:9px; padding:13px 16px; border-radius:10px; background:#1d332d; color:#fff; box-shadow:0 14px 38px #07100d50; font-size:12px; font-weight:700; }.toast span { color:#78d5aa; }
 @media (max-width:1050px){.topbar{gap:12px}.brand{min-width:auto}.brand div,.user-chip div{display:none}.user-chip{min-width:auto}.tab{min-width:105px;padding:0 8px}.summary-row{grid-template-columns:repeat(2,1fr)}.finance-metrics{grid-template-columns:repeat(2,1fr)}.net-cell{max-width:220px}.customer-layout{grid-template-columns:280px 1fr}.history-order{grid-template-columns:78px 1fr 55px 95px}.history-order>.badge,.history-order>.link-btn{display:none}}
-@media (max-width:720px){.topbar{height:68px;padding:0 8px;position:sticky}.brand{display:none}.user-chip{display:none}.parent-tabs{width:100%;gap:2px}.parent-tab{flex:1;padding:0 4px;font-size:9px}.parent-tab span{margin-right:3px}.sales-tabs{top:68px;height:54px;overflow-x:auto}.sales-tabs>div{width:100%;min-width:330px;gap:0}.tab{flex:1;min-width:0;font-size:0;padding:0 3px}.tab-short{display:inline;font-size:10px}.tab em{font-size:8px;min-width:18px;height:18px}.workspace{width:94vw;padding-top:25px}.page-heading{align-items:flex-start}.page-heading h1{font-size:31px}.page-heading>div>p:last-child{max-width:250px;line-height:1.4}.primary{padding:11px 13px;font-size:12px}.summary-row{grid-template-columns:1fr 1fr}.summary{min-height:76px;padding:14px}.summary strong{font-size:25px}.finance-filter{align-items:flex-start;flex-direction:column;gap:12px}.finance-filter>div{width:100%}.finance-filter label{flex:1}.finance-filter input{min-width:0}.finance-filter p{display:none}.finance-metrics{grid-template-columns:1fr 1fr}.finance-card{min-height:112px;padding:14px}.finance-card strong{font-size:19px}.customer-summary p{display:none}.table-tools{align-items:flex-start;gap:8px}.search-box{width:100%}.sync-note{display:none}.customer-layout{grid-template-columns:1fr}.customer-list{max-height:235px;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}.customer-detail{padding:17px}.history-order{grid-template-columns:70px minmax(120px,1fr) 80px}.history-order .history-quantity,.history-order>.badge,.history-order>.link-btn{display:none}.form-grid,.money-grid{grid-template-columns:1fr 1fr}.parsed-grid{grid-template-columns:1fr 1fr}.modal-footer{align-items:flex-start;flex-direction:column}.modal-footer>div{width:100%}.modal-footer button{flex:1}th,td{padding-left:12px;padding-right:12px}}
+@media (max-width:720px){.topbar{height:68px;padding:0 8px;position:sticky}.brand{display:none}.user-chip{display:none}.parent-tabs{width:100%;gap:2px}.parent-tab{flex:1;padding:0 4px;font-size:9px}.parent-tab span{margin-right:3px}.sales-tabs{top:68px;height:54px;overflow-x:auto}.sales-tabs>div{width:100%;min-width:330px;gap:0}.tab{flex:1;min-width:0;font-size:0;padding:0 3px}.tab-short{display:inline;font-size:10px}.tab em{font-size:8px;min-width:18px;height:18px}.workspace{width:94vw;padding-top:25px}.page-heading{align-items:flex-start}.page-heading h1{font-size:31px}.page-heading>div>p:last-child{max-width:250px;line-height:1.4}.primary{padding:11px 13px;font-size:12px}.summary-row{grid-template-columns:1fr 1fr}.summary{min-height:76px;padding:14px}.summary strong{font-size:25px}.finance-filter{align-items:flex-start;flex-direction:column;gap:12px}.finance-filter>div{width:100%}.finance-filter label{flex:1}.finance-filter input{min-width:0}.finance-filter p{display:none}.finance-metrics{grid-template-columns:1fr 1fr}.finance-card{min-height:112px;padding:14px}.finance-card strong{font-size:19px}.customer-summary p{display:none}.table-tools{align-items:flex-start;gap:8px}.search-box{width:100%}.sync-note{display:none}.customer-layout{grid-template-columns:1fr}.customer-list{max-height:235px;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}.customer-detail{padding:17px}.history-order{grid-template-columns:70px minmax(120px,1fr) 80px}.history-order .history-quantity,.history-order>.badge,.history-order>.link-btn{display:none}.form-grid,.money-grid{grid-template-columns:1fr 1fr}.parsed-grid{grid-template-columns:1fr 1fr}.modal-footer{align-items:flex-start;flex-direction:column}.modal-footer>div{width:100%}.modal-footer button{flex:1}th,td{padding-left:12px;padding-right:12px}.range-bar{flex-direction:column;align-items:flex-start;gap:10px}.range-filter{flex-wrap:wrap}.extra-item-row{grid-template-columns:1fr 1fr}.detail-grid{grid-template-columns:1fr 1fr}}
 .auth-shell { min-height:100vh; display:grid; place-items:center; padding:24px; }
 .auth-card { width:100%; max-width:380px; background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:32px 28px; box-shadow:0 20px 50px #17222608; }
 .auth-brand { display:flex; align-items:center; gap:11px; margin-bottom:26px; }
@@ -130,4 +130,40 @@ tr.row-selected { background:#f2f8f4; }
 .bulk-bar>div { display:flex; align-items:center; gap:6px; }
 .customer-edit-btn { display:inline-block; margin-top:10px; padding:6px 0; }
 .lookup-hint { color:var(--muted); font-size:10px; font-weight:600; text-transform:none; letter-spacing:0; margin-left:6px; }
+
+/* Xen kẽ màu sáng/tối giữa các hàng — dễ theo dõi ranh giới từng đơn, nhất là đơn nhiều loại lưới. */
+tbody tr:nth-child(even) { background:#fafbf9; }
+tbody tr:nth-child(even):hover { background:#f5f7f4; }
+
+/* SĐT là thứ cần tra cứu nhanh nhất — hiển thị to/đậm hơn tên khách hàng. */
+.phone-primary { font-size:14px!important; letter-spacing:-.2px; }
+
+/* Mã đơn bấm được để xem chi tiết — trông như chữ đậm bình thường, không như link. */
+.code-link { padding:0; border:0; background:transparent; color:var(--ink); font-size:13px; font-weight:700; text-align:left; }
+.code-link:hover { color:var(--green); text-decoration:underline; }
+
+/* Ô "Thông tin lưới"/"Đơn giá" khi đơn có nhiều loại lưới — mỗi loại 1 dòng, hàng cao/rộng hơn hẳn. */
+.net-cell-multi { display:grid; gap:6px; }
+.net-line { line-height:1.4; }
+.net-line em { color:#7c8883; font-style:normal; font-size:11px; }
+
+.range-bar { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; padding:14px 18px; border-bottom:1px solid var(--line); background:#fbfcfa; }
+.range-filter { display:flex; align-items:flex-end; gap:12px; }
+.range-filter label { display:flex; flex-direction:column; gap:6px; color:#6e7b76; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; }
+.range-filter input { min-width:150px; padding:9px 11px; }
+.range-total { display:flex; align-items:baseline; gap:9px; color:var(--muted); font-size:12px; font-weight:700; white-space:nowrap; }
+.range-total strong { font:600 18px Georgia,serif; color:var(--ink); }
+
+.extra-items { display:grid; gap:10px; margin-top:16px; }
+.extra-item-row { display:grid; grid-template-columns:1fr 120px 140px auto; gap:10px; align-items:end; padding:12px; border:1px solid var(--line); border-radius:9px; background:#fafbf9; }
+.extra-item-row label { display:flex; flex-direction:column; gap:7px; color:#5a6863; font-size:11px; font-weight:800; }
+
+.detail-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:18px; }
+.detail-grid div { min-height:56px; padding:10px 12px; border-radius:9px; background:#f2f6f2; }
+.detail-grid span { display:block; margin-bottom:6px; color:#7b8883; font-size:9px; text-transform:uppercase; letter-spacing:.6px; }
+.detail-grid strong { font-size:12px; line-height:1.35; }
+.detail-grid small { display:block; margin-top:4px; color:#87938f; font-size:10px; }
+.detail-items { display:grid; gap:14px; margin-top:16px; }
+.detail-item { padding:14px; border:1px solid var(--line); border-radius:10px; }
+.detail-item-money { display:flex; gap:18px; margin-top:10px; color:#5a6863; font-size:12px; }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}

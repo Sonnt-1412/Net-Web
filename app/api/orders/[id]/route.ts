@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { orders } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { toOrder } from "@/lib/orders";
+import type { NetItem } from "@/lib/order-types";
 
 type PatchBody = {
   customer?: string;
@@ -21,7 +22,21 @@ type PatchBody = {
   canceledAt?: string | null;
   cancelReason?: string;
   workers?: { gather: string; lead: string; float: string };
+  extraItems?: NetItem[];
 };
+
+// Loại bỏ dòng thiếu netInfo, ép SL/đơn giá về số hợp lệ.
+function sanitizeExtraItems(value: unknown): NetItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (item && typeof item === "object" ? (item as Partial<NetItem>) : {}))
+    .filter((item) => typeof item.netInfo === "string" && item.netInfo.trim())
+    .map((item) => ({
+      netInfo: String(item.netInfo).trim(),
+      quantity: Number(item.quantity) || 1,
+      unitPrice: Number(item.unitPrice) || 0,
+    }));
+}
 
 function buildUpdate(body: PatchBody) {
   const updates: Record<string, unknown> = {};
@@ -45,6 +60,7 @@ function buildUpdate(body: PatchBody) {
     updates.workerLead = body.workers.lead ?? "";
     updates.workerFloat = body.workers.float ?? "";
   }
+  if (body.extraItems !== undefined) updates.extraItems = sanitizeExtraItems(body.extraItems);
   return updates;
 }
 

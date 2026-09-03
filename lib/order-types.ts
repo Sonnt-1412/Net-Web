@@ -1,5 +1,9 @@
 export type Stage = "production" | "delivery" | "payment" | "canceled";
 
+// Loại lưới #2, #3... của cùng 1 đơn — loại lưới #1 nằm trực tiếp trên Order
+// (netInfo/quantity/unitPrice) để tương thích ngược với dữ liệu cũ.
+export type NetItem = { netInfo: string; quantity: number; unitPrice: number };
+
 export type Order = {
   id: number;
   code: string;
@@ -21,6 +25,7 @@ export type Order = {
   canceledAt?: string;
   cancelReason?: string;
   workers: { gather: string; lead: string; float: string };
+  extraItems: NetItem[];
 };
 
 export type Customer = {
@@ -39,4 +44,5 @@ export type OrderFormFields = {
   total: number;
   actual: number | null;
   note: string;
+  extraItems: NetItem[];
 };

@@ -1,4 +1,7 @@
-import { bigint, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigint, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+
+export type NetItem = { netInfo: string; quantity: number; unitPrice: number };
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -50,6 +53,9 @@ export const orders = pgTable("orders", {
   workerGather: text("worker_gather").notNull().default(""),
   workerLead: text("worker_lead").notNull().default(""),
   workerFloat: text("worker_float").notNull().default(""),
+  // Các loại lưới #2, #3... của cùng 1 đơn (loại lưới #1 vẫn là netInfo/quantity/unitPrice ở trên).
+  // Rỗng ([]) với đơn chỉ có 1 loại lưới — không ảnh hưởng dữ liệu cũ.
+  extraItems: jsonb("extra_items").notNull().default(sql`'[]'::jsonb`).$type<NetItem[]>(),
 });
 
 // Thông tin khách hàng "gốc" — được tạo từ đơn hàng đầu tiên của một số điện

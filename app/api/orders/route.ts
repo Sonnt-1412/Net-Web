@@ -3,8 +3,21 @@ import { orders } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { ensureCustomerFromOrder } from "@/lib/customers";
 import { listOrders, toOrder } from "@/lib/orders";
-import type { OrderFormFields } from "@/lib/order-types";
-import { eq } from "drizzle-orm";
+import type { NetItem, OrderFormFields } from "@/lib/order-types";
+import { count, eq } from "drizzle-orm";
+
+// Loại bỏ dòng thiếu netInfo, ép SL/đơn giá về số hợp lệ.
+function sanitizeExtraItems(value: unknown): NetItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (item && typeof item === "object" ? (item as Partial<NetItem>) : {}))
+    .filter((item) => typeof item.netInfo === "string" && item.netInfo.trim())
+    .map((item) => ({
+      netInfo: String(item.netInfo).trim(),
+      quantity: Number(item.quantity) || 1,
+      unitPrice: Number(item.unitPrice) || 0,
+    }));
+}
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -46,12 +59,19 @@ export async function POST(request: Request) {
         workerGather: "",
         workerLead: "",
         workerFloat: "",
+        extraItems: sanitizeExtraItems(body.extraItems),
       })
       .returning();
 
-    // Mã đơn phụ thuộc vào id được DB cấp, nên phải cập nhật sau khi insert.
+    // Mã đơn phụ thuộc vào id được DB cấp nên phải cập nhật sau khi insert.
+    // Số thứ tự lấy theo tổng số đơn CỦA RIÊNG user này (không dùng id toàn cục
+    // của bảng orders — id đó cộng dồn qua mọi user, gây hiển thị sai).
+    const [{ value: userOrderCount }] = await db
+      .select({ value: count() })
+      .from(orders)
+      .where(eq(orders.userId, user.id));
     const digits = body.phone.replace(/\D/g, "");
-    const code = `${inserted.id}-${digits.slice(-3) || "000"}`;
+    const code = `${userOrderCount}-${digits.slice(-4) || "0000"}`;
     const [order] = await db.update(orders).set({ code }).where(eq(orders.id, inserted.id)).returning();
 
     // Chỉ tạo hồ sơ khách hàng nếu số điện thoại này chưa từng đặt hàng — thông

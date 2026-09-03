@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth/session";
 import type { Customer, Order, OrderFormFields, Stage } from "@/lib/order-types";
 
@@ -38,6 +38,12 @@ const formatDateTime = (value: string) => new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
 }).format(new Date(value));
 
+// Gộp loại lưới #1 (netInfo/quantity/unitPrice trên order) với các loại lưới phụ (extraItems)
+// thành 1 danh sách để hiển thị/in — mọi nơi cần liệt kê "tất cả loại lưới của đơn" dùng hàm này.
+function allNetItems(order: Order) {
+  return [{ netInfo: order.netInfo, quantity: order.quantity, unitPrice: order.unitPrice }, ...order.extraItems];
+}
+
 const splitNet = (value: string) => {
   const parts = value.split(",").map((part) => part.trim());
   return [parts[0] || "—", parts[1] || "—", parts[2] || "—", parts.slice(3).join(", ") || "—"];
@@ -54,7 +60,9 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [customerRecords, setCustomerRecords] = useState<Customer[]>(initialCustomers);
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState<"order" | "workers" | "customer" | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [modal, setModal] = useState<"order" | "detail" | "workers" | "customer" | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
@@ -71,6 +79,8 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   };
 
   const visibleOrders = useMemo(() => {
+    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toTime = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
     const keyword = search.toLowerCase().trim();
     const filtered = orders.filter((order) => {
       const inTab =
@@ -79,7 +89,11 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
         (activeTab === "delivery" && (order.stage === "delivery" || order.stage === "payment")) ||
         (activeTab === "payment" && order.stage === "payment") ||
         (activeTab === "canceled" && order.stage === "canceled");
-      return inTab && (!keyword || `${order.code} ${order.customer} ${order.phone} ${order.note}`.toLowerCase().includes(keyword));
+      if (!inTab) return false;
+      const createdTime = new Date(order.createdAt).getTime();
+      if (fromTime !== null && createdTime < fromTime) return false;
+      if (toTime !== null && createdTime > toTime) return false;
+      return !keyword || `${order.code} ${order.customer} ${order.phone} ${order.note}`.toLowerCase().includes(keyword);
     });
     return filtered.sort((a, b) => {
       if (activeTab === "orders") {
@@ -97,7 +111,9 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
       if (activeTab === "payment") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       return 0;
     });
-  }, [activeTab, orders, search]);
+  }, [activeTab, orders, search, dateFrom, dateTo]);
+
+  const rangeTotal = useMemo(() => visibleOrders.reduce((sum, order) => sum + order.total, 0), [visibleOrders]);
 
   // Hồ sơ khách hàng "gốc" (tên + địa chỉ theo đơn đầu tiên, có thể sửa sau) —
   // ghép với lịch sử đơn hàng theo số điện thoại để hiển thị ở tab Khách Hàng.
@@ -134,6 +150,8 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     setSearch("");
+    setDateFrom("");
+    setDateTo("");
     setSelectedOrderIds(new Set());
   };
 
@@ -200,6 +218,11 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
     setModal("order");
   };
 
+  const openDetail = (id: number) => {
+    setEditingId(id);
+    setModal("detail");
+  };
+
   const cancelOrder = async (id: number) => {
     const order = orders.find((item) => item.id === id);
     if (!order || !window.confirm(`Hủy đơn ${order.code}? Đơn sẽ bị loại khỏi Sản Xuất, Giao Hàng và Nhận Tiền.`)) return;
@@ -244,6 +267,11 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   const bulkPrintOrders = (ids: number[]) => {
     const selected = orders.filter((order) => ids.includes(order.id));
     if (selected.length) exportOrdersPdf(selected);
+  };
+
+  const bulkExportHandover = (ids: number[]) => {
+    const selected = orders.filter((order) => ids.includes(order.id));
+    if (selected.length) exportHandoverSheet(selected);
   };
 
   const logout = async () => {
@@ -307,28 +335,52 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
             <div className="sync-note"><span>●</span> {activeSection === "sales" ? "Dữ liệu đồng bộ từ Đơn Hàng" : "Khách hàng được nhóm theo số điện thoại"}</div>
           </div>
 
+          {activeSection === "sales" && (
+            <div className="range-bar">
+              <div className="range-filter">
+                <label>Từ ngày tạo<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+                <label>Đến ngày tạo<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
+                {(dateFrom || dateTo) && <button type="button" className="link-btn" onClick={() => { setDateFrom(""); setDateTo(""); }}>Bỏ lọc ngày</button>}
+              </div>
+              <div className="range-total"><span>{visibleOrders.length} đơn</span><strong>{money(rangeTotal)}</strong></div>
+            </div>
+          )}
+
           {activeSection === "sales" && activeTab === "orders" && selectedOrderIds.size > 0 && (
             <div className="bulk-bar">
               <span>{selectedOrderIds.size} đơn được chọn</span>
               <div>
-                <button className="secondary compact" onClick={() => bulkPrintOrders([...selectedOrderIds])}>In các phiếu đã chọn</button>
                 <button className="danger-link" onClick={() => bulkCancelOrders([...selectedOrderIds])}>Hủy các đơn đã chọn</button>
                 <button className="link-btn" onClick={() => setSelectedOrderIds(new Set())}>Bỏ chọn</button>
               </div>
             </div>
           )}
 
+          {activeSection === "sales" && activeTab === "production" && selectedOrderIds.size > 0 && (
+            <div className="bulk-bar">
+              <span>{selectedOrderIds.size} đơn được chọn</span>
+              <div>
+                <button className="secondary compact" onClick={() => bulkPrintOrders([...selectedOrderIds])}>In các phiếu đã chọn</button>
+                <button className="compact-primary" onClick={() => bulkExportHandover([...selectedOrderIds])}>Xuất phiếu bàn giao</button>
+                <button className="link-btn" onClick={() => setSelectedOrderIds(new Set())}>Bỏ chọn</button>
+              </div>
+            </div>
+          )}
+
           {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => !search.trim() || `${customer.name} ${customer.phone}`.toLowerCase().includes(search.toLowerCase()))} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
-            {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
-            {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} />}
-            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} />}
-            {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} />}
-            {activeTab === "canceled" && <CanceledTable orders={visibleOrders} />}
+            {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openDetail} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
+            {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openDetail} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
+            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onView={openDetail} />}
+            {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} onView={openDetail} />}
+            {activeTab === "canceled" && <CanceledTable orders={visibleOrders} onView={openDetail} />}
           </>}
         </section>
         </>}
       </section>
 
+      {modal === "detail" && currentOrder && (
+        <OrderDetailModal order={currentOrder} onClose={() => setModal(null)} />
+      )}
       {modal === "order" && (
         <OrderModal
           order={currentOrder}
@@ -431,36 +483,48 @@ function Empty() {
 }
 
 function orderSheetHtml(order: Order) {
-  const parsed = splitNet(order.netInfo);
-  return `<section class="sheet">
-    <h1>PHIẾU ĐƠN HÀNG</h1>
-    <table>
-      <tr><th>Mã đơn</th><td>${order.code}</td></tr>
-      <tr><th>Ruột lưới</th><td>${parsed[0]}</td></tr>
+  const items = allNetItems(order);
+  const compact = items.length > 2 ? " compact" : "";
+  const itemRows = items
+    .map((item, i) => {
+      const parsed = splitNet(item.netInfo);
+      const label = items.length > 1 ? `Loại lưới ${i + 1}` : "Ruột lưới";
+      return `<tr><th>${label}</th><td>${parsed[0]}</td></tr>
       <tr><th>Màn</th><td>${parsed[1]}</td></tr>
       <tr><th>Phao</th><td>${parsed[2]}</td></tr>
       <tr><th>Chì</th><td>${parsed[3]}</td></tr>
-      <tr><th>Số lượng</th><td>${order.quantity}</td></tr>
+      <tr><th>Số lượng</th><td>${item.quantity}</td></tr>`;
+    })
+    .join("");
+  return `<section class="sheet${compact}">
+    <h1>PHIẾU ĐƠN HÀNG</h1>
+    <p class="printed-at">Ngày in: ${formatDateTime(new Date().toISOString())}</p>
+    <table>
+      <tr><th>Mã đơn</th><td>${order.code}</td></tr>
+      ${itemRows}
       <tr><th>Ghi chú</th><td>${order.note || "—"}</td></tr>
     </table>
   </section>`;
 }
 
-// Xuất một hoặc nhiều phiếu cùng lúc — mỗi phiếu là một trang in riêng.
+// Xuất một hoặc nhiều phiếu cùng lúc — mỗi phiếu là một trang in riêng, khổ A7.
 function exportOrdersPdf(selectedOrders: Order[]) {
   if (!selectedOrders.length) return;
-  const printWindow = window.open("", "_blank", "width=800,height=600");
+  const printWindow = window.open("", "_blank", "width=500,height=700");
   if (!printWindow) return;
   printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8" />
     <title>Phiếu đơn hàng</title>
     <style>
-      body { font-family: Arial, sans-serif; padding: 40px; color: #1a1a1a; }
+      @page { size: 74mm 105mm; margin: 3mm; }
+      body { font-family: Arial, sans-serif; padding: 4px; color: #1a1a1a; }
       .sheet { page-break-after: always; }
       .sheet:last-child { page-break-after: auto; }
-      h1 { font-size: 20px; margin-bottom: 24px; }
+      h1 { font-size: 16px; margin: 0 0 4px; text-align: center; }
+      .printed-at { margin: 0 0 8px; color: #555; font-size: 10px; text-align: center; }
       table { width: 100%; border-collapse: collapse; }
-      td, th { border: 1px solid #ccc; padding: 10px 14px; text-align: left; font-size: 14px; }
-      th { width: 200px; background: #f5f5f5; }
+      td, th { border: 1px solid #ccc; padding: 5px 7px; text-align: left; font-size: 13px; }
+      th { width: 42%; background: #f5f5f5; }
+      .sheet.compact td, .sheet.compact th { padding: 3px 5px; font-size: 10px; }
     </style>
   </head><body>${selectedOrders.map(orderSheetHtml).join("")}</body></html>`);
   printWindow.document.close();
@@ -472,51 +536,118 @@ function exportOrderPdf(order: Order) {
   exportOrdersPdf([order]);
 }
 
-function OrdersTable({ orders, onEdit, onCancel, selectedIds, onToggle, onToggleAll }: { orders: Order[]; onEdit: (id: number) => void; onCancel: (id: number) => void; selectedIds: Set<number>; onToggle: (id: number) => void; onToggleAll: (ids: number[]) => void }) {
+// Phiếu bàn giao: 1 trang duy nhất tổng hợp tất cả đơn đã chọn — khác phiếu đơn hàng ở trên.
+function exportHandoverSheet(selectedOrders: Order[]) {
+  if (!selectedOrders.length) return;
+  const printWindow = window.open("", "_blank", "width=1000,height=700");
+  if (!printWindow) return;
+  const totalQuantity = selectedOrders.reduce((sum, order) => sum + allNetItems(order).reduce((s, item) => s + item.quantity, 0), 0);
+  const rows = selectedOrders
+    .map((order, index) => {
+      const netText = allNetItems(order).map((item) => `${item.netInfo} <em>(SL ${item.quantity})</em>`).join("<br/>");
+      const quantity = allNetItems(order).reduce((sum, item) => sum + item.quantity, 0);
+      return `<tr><td>${index + 1}</td><td>${order.code}</td><td><strong>${order.phone}</strong><br/><small>${order.customer}</small></td><td>${netText}</td><td>${quantity}</td><td>${order.note || "—"}</td></tr>`;
+    })
+    .join("");
+  printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8" />
+    <title>Phiếu bàn giao</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; }
+      h1 { margin: 0 0 4px; font-size: 22px; }
+      .meta { margin: 0 0 18px; color: #555; font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; }
+      td, th { border: 1px solid #ccc; padding: 8px 10px; text-align: left; font-size: 12px; }
+      th { background: #f5f5f5; }
+      em { color: #666; font-style: normal; font-size: 11px; }
+    </style>
+  </head><body>
+    <h1>PHIẾU BÀN GIAO</h1>
+    <p class="meta">Ngày in: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length} · Tổng số lượng: ${totalQuantity}</p>
+    <table><thead><tr><th>STT</th><th>Mã đơn</th><th>Khách hàng</th><th>Thông tin lưới</th><th>Số lượng</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table>
+  </body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+// Cột "Khách hàng" dùng chung — SĐT hiển thị to/đậm vì đó là thứ cần tra cứu nhanh, tên nhỏ bên dưới.
+function CustomerCell({ name, phone }: { name: string; phone: string }) {
+  return <td><strong className="phone-primary">{phone}</strong><small>{name}</small></td>;
+}
+
+// Ô "Thông tin lưới" dùng chung — gộp loại lưới #1 và các extraItems, mỗi loại 1 dòng khi có nhiều loại.
+function NetCell({ order }: { order: Order }) {
+  const items = allNetItems(order);
+  if (items.length === 1) return <td className="net-cell">{items[0].netInfo}</td>;
+  return <td className="net-cell net-cell-multi">{items.map((item, i) => <div key={i} className="net-line">{item.netInfo} <em>× {item.quantity}</em></div>)}</td>;
+}
+
+// Ô "Số lượng" dùng chung — tổng SL mọi loại lưới của đơn.
+function QuantityCell({ order }: { order: Order }) {
+  const total = allNetItems(order).reduce((sum, item) => sum + item.quantity, 0);
+  return <td className="num quantity">{total}</td>;
+}
+
+// Ô "Đơn giá" dùng chung — mỗi loại lưới xếp 1 dòng khớp với NetCell khi đơn có nhiều loại.
+function UnitPriceCell({ order }: { order: Order }) {
+  const items = allNetItems(order);
+  if (items.length === 1) return <td className="num money">{money(items[0].unitPrice)}</td>;
+  return <td className="num money"><div className="net-cell-multi">{items.map((item, i) => <div key={i}>{money(item.unitPrice)}</div>)}</div></td>;
+}
+
+// Mã đơn bấm được ở mọi tab — mở modal xem đầy đủ thông tin đơn.
+function OrderCodeCell({ order, onView, extra }: { order: Order; onView: (id: number) => void; extra?: ReactNode }) {
+  return <td><button type="button" className="code-link" onClick={() => onView(order.id)}>{order.code}</button><small>{formatDateTime(order.createdAt)}</small>{extra}</td>;
+}
+
+function OrdersTable({ orders, onEdit, onCancel, onView, selectedIds, onToggle, onToggleAll }: { orders: Order[]; onEdit: (id: number) => void; onCancel: (id: number) => void; onView: (id: number) => void; selectedIds: Set<number>; onToggle: (id: number) => void; onToggleAll: (ids: number[]) => void }) {
   if (!orders.length) return <Empty />;
   const ids = orders.map((order) => order.id);
   const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
-  return <div className="table-wrap"><table><thead><tr><th className="select-col"><input type="checkbox" checked={allSelected} onChange={() => onToggleAll(ids)} aria-label="Chọn tất cả" /></th><th>Mã đơn</th><th>Khách hàng</th><th>Thông tin lưới</th><th>Ghi chú</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th>Vị trí</th><th></th></tr></thead><tbody>
+  return <div className="table-wrap"><table><thead><tr><th className="select-col"><input type="checkbox" checked={allSelected} onChange={() => onToggleAll(ids)} aria-label="Chọn tất cả" /></th><th>Mã đơn</th><th>Khách hàng</th><th>Thông tin lưới</th><th className="num">Đơn giá</th><th>Ghi chú</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th>Vị trí</th><th></th></tr></thead><tbody>
     {orders.map((order) => <tr key={order.id} className={selectedIds.has(order.id) ? "row-selected" : undefined}>
       <td className="select-col"><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => onToggle(order.id)} aria-label={`Chọn đơn ${order.code}`} /></td>
-      <td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></td>
-      <td><strong>{order.customer}</strong><small>{order.phone}</small></td>
-      <td className="net-cell">{order.netInfo}</td><td className="note-cell">{order.note || "—"}</td><td className="num quantity">{order.quantity}</td>
+      <OrderCodeCell order={order} onView={onView} />
+      <CustomerCell name={order.customer} phone={order.phone} />
+      <NetCell order={order} /><UnitPriceCell order={order} /><td className="note-cell">{order.note || "—"}</td><QuantityCell order={order} />
       <td className="num money">{money(order.total)}</td><td className={`num money ${order.actual === null ? "muted" : "actual"}`}>{money(order.actual)}</td>
-      <td><StageBadge stage={order.stage} /></td><td><div className="row-actions"><button className="link-btn" onClick={() => onEdit(order.id)}>Sửa</button><button className="link-btn" onClick={() => exportOrderPdf(order)}>Xuất phiếu</button><button className="danger-link" onClick={() => onCancel(order.id)}>Hủy</button></div></td>
+      <td><StageBadge stage={order.stage} /></td><td><div className="row-actions"><button className="link-btn" onClick={() => onEdit(order.id)}>Sửa</button><button className="danger-link" onClick={() => onCancel(order.id)}>Hủy</button></div></td>
     </tr>)}
   </tbody></table></div>;
 }
 
-function ProductionTable({ orders, onEditWorkers, onMove }: { orders: Order[]; onEditWorkers: (id: number) => void; onMove: (id: number) => void }) {
+function ProductionTable({ orders, onEditWorkers, onMove, onView, selectedIds, onToggle, onToggleAll }: { orders: Order[]; onEditWorkers: (id: number) => void; onMove: (id: number) => void; onView: (id: number) => void; selectedIds: Set<number>; onToggle: (id: number) => void; onToggleAll: (ids: number[]) => void }) {
   if (!orders.length) return <Empty />;
-  return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Thông tin lưới</th><th className="num">SL</th><th>Lượm lưới</th><th>Dập chì</th><th>Cột phao</th><th></th></tr></thead><tbody>
-    {orders.map((order) => <tr key={order.id}>
-      <td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small><small>{order.phone}</small></td><td className="net-cell">{order.netInfo}</td><td className="num quantity">{order.quantity}</td>
+  const ids = orders.map((order) => order.id);
+  const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+  return <div className="table-wrap"><table><thead><tr><th className="select-col"><input type="checkbox" checked={allSelected} onChange={() => onToggleAll(ids)} aria-label="Chọn tất cả" /></th><th>Mã đơn</th><th>Thông tin lưới</th><th className="num">SL</th><th>Lượm lưới</th><th>Dập chì</th><th>Cột phao</th><th></th></tr></thead><tbody>
+    {orders.map((order) => <tr key={order.id} className={selectedIds.has(order.id) ? "row-selected" : undefined}>
+      <td className="select-col"><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => onToggle(order.id)} aria-label={`Chọn đơn ${order.code}`} /></td>
+      <OrderCodeCell order={order} onView={onView} extra={<small>{order.phone}</small>} /><NetCell order={order} /><QuantityCell order={order} />
       <td><Worker value={order.workers.gather} /></td><td><Worker value={order.workers.lead} /></td><td><Worker value={order.workers.float} /></td>
-      <td><div className="row-actions"><button className="link-btn" onClick={() => onEditWorkers(order.id)}>Cập nhật</button><button className="compact-primary" onClick={() => onMove(order.id)}>Chuyển giao →</button></div></td>
+      <td><div className="row-actions"><button className="link-btn" onClick={() => onEditWorkers(order.id)}>Cập nhật</button><button className="link-btn" onClick={() => exportOrderPdf(order)}>Xuất phiếu</button><button className="compact-primary" onClick={() => onMove(order.id)}>Chuyển giao →</button></div></td>
     </tr>)}
   </tbody></table></div>;
 }
 
-function DeliveryTable({ orders, onToggle }: { orders: Order[]; onToggle: (id: number) => void }) {
+function DeliveryTable({ orders, onToggle, onView }: { orders: Order[]; onToggle: (id: number) => void; onView: (id: number) => void }) {
   if (!orders.length) return <Empty />;
   return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-    {orders.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td>{order.address}</td><td className="num quantity">{order.quantity}</td><td className="num money">{money(order.total)}</td><td><span className={order.deliveryStatus === "Đã giao" ? "badge delivered" : "badge waiting"}>{order.deliveryStatus}</span></td><td><button className={order.deliveryStatus === "Đã giao" ? "secondary compact" : "compact-primary"} onClick={() => onToggle(order.id)}>{order.deliveryStatus === "Đã giao" ? "Chuyển về Chưa giao" : "Đánh dấu đã giao"}</button></td></tr>)}
+    {orders.map((order) => <tr key={order.id}><OrderCodeCell order={order} onView={onView} /><CustomerCell name={order.customer} phone={order.phone} /><td>{order.address}</td><QuantityCell order={order} /><td className="num money">{money(order.total)}</td><td><span className={order.deliveryStatus === "Đã giao" ? "badge delivered" : "badge waiting"}>{order.deliveryStatus}</span></td><td><button className={order.deliveryStatus === "Đã giao" ? "secondary compact" : "compact-primary"} onClick={() => onToggle(order.id)}>{order.deliveryStatus === "Đã giao" ? "Chuyển về Chưa giao" : "Đánh dấu đã giao"}</button></td></tr>)}
   </tbody></table></div>;
 }
 
-function PaymentTable({ orders, onPaid, onEdit }: { orders: Order[]; onPaid: (id: number) => void; onEdit: (id: number) => void }) {
+function PaymentTable({ orders, onPaid, onEdit, onView }: { orders: Order[]; onPaid: (id: number) => void; onEdit: (id: number) => void; onView: (id: number) => void }) {
   if (!orders.length) return <Empty />;
   return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th>Chênh lệch</th><th>Nhận tiền</th><th></th></tr></thead><tbody>
-    {orders.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td className="num money total-highlight">{money(order.total)}</td><td className={`num money ${order.actual === null ? "muted" : "actual-highlight"}`}>{money(order.actual)}</td><td className="money difference">{order.actual === null ? "—" : money(order.total - order.actual)}</td><td><span className={order.paymentStatus === "Đã nhận tiền" ? "badge paid" : "badge unpaid"}>{order.paymentStatus}</span>{order.paymentDate && <small>{formatDateTime(order.paymentDate)}</small>}</td><td><div className="row-actions">{order.actual === null && <button className="link-btn" onClick={() => onEdit(order.id)}>Nhập thực thu</button>}<button className="compact-primary" onClick={() => onPaid(order.id)}>{order.paymentStatus === "Đã nhận tiền" ? "Hoàn tác" : "Đã nhận tiền"}</button></div></td></tr>)}
+    {orders.map((order) => <tr key={order.id}><OrderCodeCell order={order} onView={onView} /><CustomerCell name={order.customer} phone={order.phone} /><td className="num money total-highlight">{money(order.total)}</td><td className={`num money ${order.actual === null ? "muted" : "actual-highlight"}`}>{money(order.actual)}</td><td className="money difference">{order.actual === null ? "—" : money(order.total - order.actual)}</td><td><span className={order.paymentStatus === "Đã nhận tiền" ? "badge paid" : "badge unpaid"}>{order.paymentStatus}</span>{order.paymentDate && <small>{formatDateTime(order.paymentDate)}</small>}</td><td><div className="row-actions">{order.actual === null && <button className="link-btn" onClick={() => onEdit(order.id)}>Nhập thực thu</button>}<button className="compact-primary" onClick={() => onPaid(order.id)}>{order.paymentStatus === "Đã nhận tiền" ? "Hoàn tác" : "Đã nhận tiền"}</button></div></td></tr>)}
   </tbody></table></div>;
 }
 
-function CanceledTable({ orders }: { orders: Order[] }) {
+function CanceledTable({ orders, onView }: { orders: Order[]; onView: (id: number) => void }) {
   if (!orders.length) return <Empty />;
   return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Thông tin lưới</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th>Lý do hủy</th><th>Thời gian hủy</th></tr></thead><tbody>
-    {orders.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td className="net-cell">{order.netInfo}</td><td className="num quantity">{order.quantity}</td><td className="num money">{money(order.total)}</td><td className="cancel-reason">{order.cancelReason || "Không có lý do"}</td><td><span className="badge canceled">Đã hủy</span>{order.canceledAt && <small>{formatDateTime(order.canceledAt)}</small>}</td></tr>)}
+    {orders.map((order) => <tr key={order.id}><OrderCodeCell order={order} onView={onView} /><CustomerCell name={order.customer} phone={order.phone} /><NetCell order={order} /><QuantityCell order={order} /><td className="num money">{money(order.total)}</td><td className="cancel-reason">{order.cancelReason || "Không có lý do"}</td><td><span className="badge canceled">Đã hủy</span>{order.canceledAt && <small>{formatDateTime(order.canceledAt)}</small>}</td></tr>)}
   </tbody></table></div>;
 }
 
@@ -542,7 +673,7 @@ function FinanceView({ orders }: { orders: Order[] }) {
       <div className="finance-card"><span>Tỷ lệ thực thu</span><strong>{billed ? `${((actual / billed) * 100).toFixed(1)}%` : "0%"}</strong><small>Thực thu / thành tiền</small></div>
     </div>
     <div className="data-card finance-table"><div className="finance-table-head"><div><strong>Chi tiết khoản thu</strong><span>{formatShortDate(from)} – {formatShortDate(to)}</span></div><em>{paid.length} giao dịch</em></div>
-      {paid.length ? <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày nhận tiền</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th className="num">Chênh lệch</th></tr></thead><tbody>{paid.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></td><td><strong>{order.customer}</strong><small>{order.phone}</small></td><td>{order.paymentDate ? formatDateTime(order.paymentDate) : "—"}</td><td className="num money">{money(order.total)}</td><td className="num money actual">{money(order.actual)}</td><td className="num money difference">{money(order.total - (order.actual || 0))}</td></tr>)}</tbody></table></div> : <Empty />}
+      {paid.length ? <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày nhận tiền</th><th className="num">Thành tiền</th><th className="num">Thực thu</th><th className="num">Chênh lệch</th></tr></thead><tbody>{paid.map((order) => <tr key={order.id}><td><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></td><CustomerCell name={order.customer} phone={order.phone} /><td>{order.paymentDate ? formatDateTime(order.paymentDate) : "—"}</td><td className="num money">{money(order.total)}</td><td className="num money actual">{money(order.actual)}</td><td className="num money difference">{money(order.total - (order.actual || 0))}</td></tr>)}</tbody></table></div> : <Empty />}
     </div>
   </section>;
 }
@@ -559,14 +690,14 @@ function CustomersView({ customers, selectedPhone, onSelect, onEditOrder, onEdit
     <aside className="customer-list">
       {customers.map((customer) => <button key={customer.phone} className={customer.phone === selected.phone ? "customer-item active" : "customer-item"} onClick={() => onSelect(customer.phone)}>
         <span className="customer-avatar">{customer.name.split(" ").slice(-2).map((part) => part[0]).join("")}</span>
-        <span><strong>{customer.name}</strong><small>{customer.phone}</small></span><em>{customer.orders.length} đơn</em>
+        <span><strong className="phone-primary">{customer.phone}</strong><small>{customer.name}</small></span><em>{customer.orders.length} đơn</em>
       </button>)}
     </aside>
     <section className="customer-detail">
-      <div className="customer-detail-head"><div><p className="eyebrow">LỊCH SỬ KHÁCH HÀNG</p><h2>{selected.name}</h2><p>{selected.phone} · {selected.address}</p><button type="button" className="link-btn customer-edit-btn" onClick={() => onEditCustomer(selected.phone)}>✎ Sửa thông tin khách hàng</button></div><div><span>Tổng số đơn</span><strong>{selected.orders.length}</strong></div></div>
+      <div className="customer-detail-head"><div><p className="eyebrow">LỊCH SỬ KHÁCH HÀNG</p><h2>{selected.phone}</h2><p>{selected.name} · {selected.address}</p><button type="button" className="link-btn customer-edit-btn" onClick={() => onEditCustomer(selected.phone)}>✎ Sửa thông tin khách hàng</button></div><div><span>Tổng số đơn</span><strong>{selected.orders.length}</strong></div></div>
       <div className="history-list">{historicalOrders.map((order) => <article key={order.id} className="history-order">
-        <div><strong>{order.code}</strong><small>{formatDateTime(order.createdAt)}</small></div>
-        <p>{order.netInfo}</p><span className="history-quantity">{order.quantity} lưới</span><strong className="history-money">{money(order.total)}</strong><StageBadge stage={order.stage} /><button className="link-btn" onClick={() => onEditOrder(order.id)}>Xem đơn</button>
+        <div><button type="button" className="code-link" onClick={() => onEditOrder(order.id)}>{order.code}</button><small>{formatDateTime(order.createdAt)}</small></div>
+        <p>{allNetItems(order).map((item) => item.netInfo).join(" · ")}</p><span className="history-quantity">{allNetItems(order).reduce((sum, item) => sum + item.quantity, 0)} lưới</span><strong className="history-money">{money(order.total)}</strong><StageBadge stage={order.stage} /><button className="link-btn" onClick={() => onEditOrder(order.id)}>Xem đơn</button>
       </article>)}</div>
     </section>
   </div>;
@@ -595,12 +726,35 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Orde
   });
   const [manualTotal, setManualTotal] = useState(Boolean(order));
   const [lookingUp, setLookingUp] = useState(false);
+  // Các loại lưới #2, #3... của đơn — mỗi loại có SL + đơn giá riêng, thành tiền vẫn chung cho cả đơn.
+  const [extraItems, setExtraItems] = useState(
+    (order?.extraItems || []).map((item) => ({ netInfo: item.netInfo, quantity: String(item.quantity), unitPrice: String(item.unitPrice) })),
+  );
   const parsed = splitNet(form.netInfo);
+
+  const autoTotal = (quantity: string, unitPrice: string, items: typeof extraItems) =>
+    String(
+      Number(quantity) * Number(unitPrice) +
+        items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0),
+    ) || "";
+
   const update = (key: keyof typeof form, value: string) => {
     const next = { ...form, [key]: value };
-    if (!manualTotal && (key === "quantity" || key === "unitPrice")) next.total = String(Number(next.quantity) * Number(next.unitPrice) || "");
+    if (!manualTotal && (key === "quantity" || key === "unitPrice")) next.total = autoTotal(next.quantity, next.unitPrice, extraItems);
     setForm(next);
   };
+
+  const addExtraItem = () => setExtraItems((items) => [...items, { netInfo: "", quantity: "1", unitPrice: "" }]);
+  const removeExtraItem = (index: number) => setExtraItems((items) => {
+    const next = items.filter((_, i) => i !== index);
+    if (!manualTotal) setForm((prev) => ({ ...prev, total: autoTotal(prev.quantity, prev.unitPrice, next) }));
+    return next;
+  });
+  const updateExtraItem = (index: number, key: "netInfo" | "quantity" | "unitPrice", value: string) => setExtraItems((items) => {
+    const next = items.map((item, i) => (i === index ? { ...item, [key]: value } : item));
+    if (!manualTotal) setForm((prev) => ({ ...prev, total: autoTotal(prev.quantity, prev.unitPrice, next) }));
+    return next;
+  });
 
   // Tạo đơn mới: nhập số điện thoại trước, tự động điền tên + địa chỉ nếu đã
   // là khách quen — không đè lên nội dung người dùng đã tự gõ.
@@ -636,6 +790,9 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Orde
       total: Number(form.total),
       actual: form.actual ? Number(form.actual) : null,
       note: form.note,
+      extraItems: extraItems
+        .filter((item) => item.netInfo.trim())
+        .map((item) => ({ netInfo: item.netInfo.trim(), quantity: Number(item.quantity) || 1, unitPrice: Number(item.unitPrice) || 0 })),
     });
   };
   return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal" onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
@@ -653,6 +810,17 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Orde
       <label>Thành tiền<input inputMode="numeric" required value={formatMoneyInput(form.total)} onChange={(e) => { setManualTotal(true); update("total", digitsOnly(e.target.value)); }} /></label>
       <label>Thực thu<input inputMode="numeric" value={formatMoneyInput(form.actual)} onChange={(e) => update("actual", digitsOnly(e.target.value))} placeholder="Bỏ trống = mặc định 0đ" /></label>
       <label className="wide">Ghi chú<input value={form.note} onChange={(e) => update("note", e.target.value)} /></label>
+    </div>
+    <div className="extra-items">
+      {extraItems.map((item, index) => (
+        <div key={index} className="extra-item-row">
+          <label className="wide">Loại lưới {index + 2}<input value={item.netInfo} onChange={(e) => updateExtraItem(index, "netInfo", e.target.value)} placeholder="Ruột lưới, màn, phao, chì" /></label>
+          <label>Số lượng<input type="number" min="1" value={item.quantity} onChange={(e) => updateExtraItem(index, "quantity", e.target.value)} /></label>
+          <label>Đơn giá<input inputMode="numeric" value={formatMoneyInput(item.unitPrice)} onChange={(e) => updateExtraItem(index, "unitPrice", digitsOnly(e.target.value))} /></label>
+          <button type="button" className="danger-link" onClick={() => removeExtraItem(index)}>Xoá</button>
+        </div>
+      ))}
+      <button type="button" className="link-btn" onClick={addExtraItem}>+ Thêm loại lưới</button>
     </div>
     <div className="modal-footer"><p><span>●</span> Thành tiền và Thực thu sẽ đồng bộ sang Nhận Tiền</p><div><button type="button" className="secondary" onClick={onClose}>Hủy</button><button className="primary">{order ? "Lưu thay đổi" : "Tạo đơn"}</button></div></div>
   </form></div>;
@@ -675,4 +843,40 @@ function CustomerEditModal({ customer, onClose, onSave }: { customer: Customer; 
     <div className="form-grid"><label className="wide">Tên khách hàng<input required value={name} onChange={(e) => setName(e.target.value)} /></label><label className="wide">Địa chỉ<input value={address} onChange={(e) => setAddress(e.target.value)} /></label></div>
     <div className="modal-footer"><p><span>●</span> Thông tin mới sẽ ghi đè hồ sơ khách hàng hiện tại</p><div><button type="button" className="secondary" onClick={onClose}>Hủy</button><button className="primary">Lưu thay đổi</button></div></div>
   </form></div>;
+}
+
+// Xem đầy đủ thông tin 1 đơn hàng (chỉ đọc) — mở khi bấm vào mã đơn ở bất kỳ tab nào.
+function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  const items = allNetItems(order);
+  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="modal-head"><div><p className="eyebrow">CHI TIẾT ĐƠN HÀNG</p><h2>{order.code}</h2></div><button type="button" className="close" onClick={onClose}>×</button></div>
+    <div className="detail-grid">
+      <div><span>Ngày tạo</span><strong>{formatDateTime(order.createdAt)}</strong></div>
+      <div><span>Trạng thái</span><StageBadge stage={order.stage} /></div>
+      <div><span>Khách hàng</span><strong className="phone-primary">{order.phone}</strong><small>{order.customer}</small></div>
+      <div><span>Địa chỉ</span><strong>{order.address || "—"}</strong></div>
+    </div>
+    <div className="detail-items">
+      {items.map((item, i) => {
+        const parsed = splitNet(item.netInfo);
+        return <div key={i} className="detail-item">
+          <p className="eyebrow">{items.length > 1 ? `LOẠI LƯỚI ${i + 1}` : "THÔNG TIN LƯỚI"}</p>
+          <div className="parsed-grid">{["Ruột lưới", "Màn", "Phao", "Chì"].map((label, j) => <div key={label}><span>{label}</span><strong>{parsed[j]}</strong></div>)}</div>
+          <div className="detail-item-money"><span>Số lượng: <strong>{item.quantity}</strong></span><span>Đơn giá: <strong>{money(item.unitPrice)}</strong></span></div>
+        </div>;
+      })}
+    </div>
+    <div className="detail-grid">
+      <div><span>Thành tiền</span><strong>{money(order.total)}</strong></div>
+      <div><span>Thực thu</span><strong>{money(order.actual)}</strong></div>
+      <div><span>Giao hàng</span><strong>{order.deliveryStatus}</strong></div>
+      <div><span>Thanh toán</span><strong>{order.paymentStatus}</strong>{order.paymentDate && <small>{formatDateTime(order.paymentDate)}</small>}</div>
+      <div><span>Lượm lưới</span><strong>{order.workers.gather || "—"}</strong></div>
+      <div><span>Dập chì</span><strong>{order.workers.lead || "—"}</strong></div>
+      <div><span>Cột phao</span><strong>{order.workers.float || "—"}</strong></div>
+      <div><span>Ghi chú</span><strong>{order.note || "—"}</strong></div>
+      {order.stage === "canceled" && <div><span>Lý do hủy</span><strong>{order.cancelReason || "—"}</strong>{order.canceledAt && <small>{formatDateTime(order.canceledAt)}</small>}</div>}
+    </div>
+    <div className="modal-footer"><p><span>●</span> Xem đầy đủ thông tin đơn — bấm &quot;Sửa&quot; ở bảng để chỉnh sửa</p><div><button type="button" className="secondary" onClick={onClose}>Đóng</button></div></div>
+  </div></div>;
 }
