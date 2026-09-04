@@ -180,4 +180,14 @@ tbody tr:nth-child(even):hover { background:#f5f7f4; }
 .detail-items { display:grid; gap:14px; margin-top:16px; }
 .detail-item { padding:14px; border:1px solid var(--line); border-radius:10px; }
 .detail-item-money { display:flex; gap:18px; margin-top:10px; color:#5a6863; font-size:14px; }
+
+/* Gợi ý SĐT — dùng chung cho ô tìm kiếm và ô SĐT khi tạo/sửa đơn. */
+.phone-suggest { position:relative; flex:1; }
+.search-box .phone-suggest input { width:100%; }
+.phone-suggest-list { position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:30; overflow:auto; max-height:230px; padding:6px; border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:0 14px 32px #07100d1f; list-style:none; margin:0; }
+.phone-suggest-list li { display:block; }
+.phone-suggest-list button { display:flex; align-items:baseline; gap:9px; width:100%; padding:9px 10px; border:0; border-radius:7px; background:transparent; text-align:left; }
+.phone-suggest-list button:hover { background:var(--green-soft); }
+.phone-suggest-list strong { font-size:14px; }
+.phone-suggest-list small { color:#5c6864; font-size:12px; }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}

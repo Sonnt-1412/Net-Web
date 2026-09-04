@@ -334,7 +334,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
 
         <section className="data-card">
           <div className="table-tools">
-            <div className="search-box"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã đơn, khách hàng, số điện thoại..." /></div>
+            <div className="search-box"><span>⌕</span><PhoneSuggestInput value={search} onChange={setSearch} suggestions={customers} placeholder="Tìm mã đơn, khách hàng, số điện thoại..." /></div>
             <div className="sync-note"><span>●</span> {activeSection === "sales" ? "Dữ liệu đồng bộ từ Đơn Hàng" : "Khách hàng được nhóm theo số điện thoại"}</div>
           </div>
 
@@ -387,6 +387,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
       {modal === "order" && (
         <OrderModal
           order={currentOrder}
+          phoneSuggestions={customers}
           onLookupCustomer={async (phone) => {
             try {
               const res = await fetch(`/api/customers/${encodeURIComponent(phone)}`);
@@ -497,11 +498,11 @@ function orderSheetHtml(order: Order) {
     <p class="printed-at">Ngày in: ${formatDateTime(new Date().toISOString())}</p>
     <table>
       <tr><th>Mã đơn</th><td>${order.code}</td></tr>
+      <tr><th>Số lượng</th><td>${item.quantity}</td></tr>
       <tr><th>Ruột lưới</th><td>${parsed[0]}</td></tr>
       <tr><th>Màn</th><td>${parsed[1]}</td></tr>
       <tr><th>Phao</th><td>${parsed[2]}</td></tr>
       <tr><th>Chì</th><td>${parsed[3]}</td></tr>
-      <tr><th>Số lượng</th><td>${item.quantity}</td></tr>
       <tr><th>Ghi chú</th><td>${order.note || "—"}</td></tr>
     </table>
   </section>`;
@@ -622,6 +623,45 @@ function exportOrdersExcel(selectedOrders: Order[]) {
 // Cột "Khách hàng" dùng chung — SĐT hiển thị to/đậm vì đó là thứ cần tra cứu nhanh, tên nhỏ bên dưới.
 function CustomerCell({ name, phone }: { name: string; phone: string }) {
   return <td><strong className="phone-primary">{phone}</strong><small>{name}</small></td>;
+}
+
+// Ô nhập SĐT gợi ý theo khách hàng đã có — gõ vài số là hiện danh sách để chọn thẳng, dùng
+// chung cho cả ô tìm kiếm và ô SĐT khi tạo/sửa đơn.
+function PhoneSuggestInput({ value, onChange, suggestions, placeholder, required }: {
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: { phone: string; name: string }[];
+  placeholder?: string;
+  required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const digits = value.replace(/\D/g, "");
+  const matches = digits.length < 2 ? [] : suggestions
+    .filter((s) => s.phone !== value && s.phone.replace(/\D/g, "").includes(digits))
+    .slice(0, 6);
+  return (
+    <div className="phone-suggest">
+      <input
+        required={required}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+      />
+      {open && matches.length > 0 && (
+        <ul className="phone-suggest-list">
+          {matches.map((s) => (
+            <li key={s.phone}>
+              <button type="button" onMouseDown={() => { onChange(s.phone); setOpen(false); }}>
+                <strong>{s.phone}</strong><small>{s.name}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 // Ô "Thông tin lưới" dùng chung — gộp loại lưới #1 và các extraItems, mỗi loại 1 dòng khi có nhiều loại.
@@ -772,7 +812,7 @@ function Worker({ value }: { value: string }) {
   return value ? <span className="worker">{value}</span> : <span className="worker empty-worker">Chưa có</span>;
 }
 
-function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => Promise<void>; onLookupCustomer: (phone: string) => Promise<Customer | null> }) {
+function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => Promise<void>; onLookupCustomer: (phone: string) => Promise<Customer | null>; phoneSuggestions: { phone: string; name: string }[] }) {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     customer: order?.customer || "",
@@ -865,7 +905,7 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer }: { order?: Orde
   return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal" onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
     <div className="modal-head"><div><p className="eyebrow">ĐƠN HÀNG GỐC</p><h2>{order ? `Sửa đơn ${order.code}` : "Tạo đơn hàng mới"}</h2></div><button type="button" className="close" onClick={onClose}>×</button></div>
     <div className="form-grid">
-      <label>Số điện thoại<input required value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="Nhập số điện thoại trước để tự điền khách quen" /></label>
+      <label>Số điện thoại<PhoneSuggestInput required value={form.phone} onChange={(value) => update("phone", value)} suggestions={phoneSuggestions} placeholder="Nhập số điện thoại trước để tự điền khách quen" /></label>
       <label>Khách hàng{lookingUp && <em className="lookup-hint"> đang tìm khách hàng…</em>}<input required value={form.customer} onChange={(e) => update("customer", e.target.value)} /></label>
       <label className="wide">Địa chỉ<input value={form.address} onChange={(e) => update("address", e.target.value)} /></label>
     </div>
