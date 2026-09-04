@@ -61,8 +61,16 @@ tbody tr:hover { background:#fbfcfa; }
 td strong { display:block; font-size:13px; }
 td small { display:block; margin-top:5px; color:#87938f; font-size:10px; }
 .num { text-align:right; white-space:nowrap; }.quantity { font-weight:800; font-size:15px; }.money { font-weight:700; font-variant-numeric:tabular-nums; }.actual { color:var(--green); }.muted { color:#9da6a2; font-weight:500; }.net-cell { max-width:310px; color:#52615c; line-height:1.45; }
-.badge { display:inline-flex; align-items:center; padding:6px 9px; border-radius:15px; font-size:10px; font-weight:800; white-space:nowrap; }
-.badge.production,.badge.waiting { color:var(--amber); background:var(--amber-soft); }.badge.delivery { color:var(--blue); background:var(--blue-soft); }.badge.delivered { color:var(--green); background:var(--green-soft); }.badge.payment,.badge.unpaid { color:#a45b27; background:#fff0e3; }.badge.paid { color:var(--green); background:var(--green-soft); }.badge.canceled { color:#9a3f3f; background:#fae9e7; }
+.badge { display:inline-flex; align-items:center; padding:6px 9px; border:1px solid transparent; border-radius:15px; font-size:10px; font-weight:800; white-space:nowrap; }
+/* Viền màu cho từng trạng thái để badge nổi rõ trên nền trắng, dễ phân biệt hơn khi liếc nhanh. */
+.badge.production,.badge.waiting { color:var(--amber); background:var(--amber-soft); border-color:#eccb93; }
+/* Đơn "Sản xuất" chưa có ai nhận việc thì nhạt; đã có người làm ("Đang sản xuất") thì tô đậm hẳn để phân biệt ngay. */
+.badge.production.active { color:#fff; background:#b8721c; border-color:#8f5714; }
+.badge.delivery { color:var(--blue); background:var(--blue-soft); border-color:#b9d3e6; }
+.badge.delivered { color:var(--green); background:var(--green-soft); border-color:#bfe0cd; }
+.badge.payment,.badge.unpaid { color:#a45b27; background:#fff0e3; border-color:#f0c99e; }
+.badge.paid { color:var(--green); background:var(--green-soft); border-color:#bfe0cd; }
+.badge.canceled { color:#9a3f3f; background:#fae9e7; border-color:#f0c1bd; }
 .worker { display:inline-block; max-width:145px; color:#38504a; font-size:11px; line-height:1.4; }.empty-worker { color:#9aa49f; font-style:italic; }
 .row-actions { display:flex; align-items:center; justify-content:flex-end; gap:7px; white-space:nowrap; }
 .link-btn { padding:7px 9px; border:0; color:var(--green); background:transparent; font-size:11px; font-weight:800; }.link-btn:hover { background:var(--green-soft); border-radius:7px; }

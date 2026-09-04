@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth/session";
-import type { Customer, Order, OrderFormFields, Stage } from "@/lib/order-types";
+import type { Customer, Order, OrderFormFields } from "@/lib/order-types";
 
 type Tab = "orders" | "production" | "delivery" | "payment" | "canceled";
 type Section = "sales" | "customers" | "finance";
@@ -595,7 +595,7 @@ function exportOrdersExcel(selectedOrders: Order[]) {
       String(totalQuantity),
       String(order.total),
       order.actual === null ? "" : String(order.actual),
-      stageLabel(order.stage),
+      stageLabel(order),
       order.deliveryStatus,
       order.paymentStatus,
       order.paymentDate ? formatDateTime(order.paymentDate) : "",
@@ -660,7 +660,7 @@ function OrdersTable({ orders, onEdit, onCancel, onView, selectedIds, onToggle, 
       <CustomerCell name={order.customer} phone={order.phone} />
       <NetCell order={order} /><UnitPriceCell order={order} /><td className="note-cell">{order.note || "—"}</td><QuantityCell order={order} />
       <td className="num money">{money(order.total)}</td><td className={`num money ${order.actual === null ? "muted" : "actual"}`}>{money(order.actual)}</td>
-      <td><StageBadge stage={order.stage} /></td><td><div className="row-actions"><button className="link-btn" onClick={() => onEdit(order.id)}>Sửa</button><button className="danger-link" onClick={() => onCancel(order.id)}>Hủy</button></div></td>
+      <td><StageBadge order={order} /></td><td><div className="row-actions"><button className="link-btn" onClick={() => onEdit(order.id)}>Sửa</button><button className="danger-link" onClick={() => onCancel(order.id)}>Hủy</button></div></td>
     </tr>)}
   </tbody></table></div>;
 }
@@ -746,18 +746,26 @@ function CustomersView({ customers, selectedPhone, onSelect, onEditOrder, onEdit
       <div className="customer-detail-head"><div><p className="eyebrow">LỊCH SỬ KHÁCH HÀNG</p><h2>{selected.phone}</h2><p>{selected.name} · {selected.address}</p><button type="button" className="link-btn customer-edit-btn" onClick={() => onEditCustomer(selected.phone)}>✎ Sửa thông tin khách hàng</button></div><div><span>Tổng số đơn</span><strong>{selected.orders.length}</strong></div></div>
       <div className="history-list">{historicalOrders.map((order) => <article key={order.id} className="history-order">
         <div><button type="button" className="code-link" onClick={() => onEditOrder(order.id)}>{order.code}</button><small>{formatDateTime(order.createdAt)}</small></div>
-        <p>{allNetItems(order).map((item) => item.netInfo).join(" · ")}</p><span className="history-quantity">{allNetItems(order).reduce((sum, item) => sum + item.quantity, 0)} lưới</span><strong className="history-money">{money(order.total)}</strong><StageBadge stage={order.stage} /><button className="link-btn" onClick={() => onEditOrder(order.id)}>Xem đơn</button>
+        <p>{allNetItems(order).map((item) => item.netInfo).join(" · ")}</p><span className="history-quantity">{allNetItems(order).reduce((sum, item) => sum + item.quantity, 0)} lưới</span><strong className="history-money">{money(order.total)}</strong><StageBadge order={order} /><button className="link-btn" onClick={() => onEditOrder(order.id)}>Xem đơn</button>
       </article>)}</div>
     </section>
   </div>;
 }
 
-function stageLabel(stage: Stage) {
-  return stage === "production" ? "Sản xuất" : stage === "delivery" ? "Đang giao" : stage === "payment" ? "Nhận tiền" : "Đã hủy";
+// Đã có người nhận ít nhất 1 công đoạn (lượm lưới/dập chì/cột phao) — dùng để phân biệt
+// đơn "Sản xuất" (chưa ai làm) với "Đang sản xuất" (đã có người bắt tay vào).
+function hasAssignedWorker(order: Order) {
+  return Boolean(order.workers.gather || order.workers.lead || order.workers.float);
 }
 
-function StageBadge({ stage }: { stage: Stage }) {
-  return <span className={`badge ${stage}`}>{stageLabel(stage)}</span>;
+function stageLabel(order: Order) {
+  if (order.stage === "production") return hasAssignedWorker(order) ? "Đang sản xuất" : "Sản xuất";
+  return order.stage === "delivery" ? "Đang giao" : order.stage === "payment" ? "Nhận tiền" : "Đã hủy";
+}
+
+function StageBadge({ order }: { order: Order }) {
+  const active = order.stage === "production" && hasAssignedWorker(order);
+  return <span className={`badge ${order.stage}${active ? " active" : ""}`}>{stageLabel(order)}</span>;
 }
 
 function Worker({ value }: { value: string }) {
@@ -922,7 +930,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
     <div className="modal-head"><div><p className="eyebrow">CHI TIẾT ĐƠN HÀNG</p><h2>{order.code}</h2></div><button type="button" className="close" onClick={onClose}>×</button></div>
     <div className="detail-grid">
       <div><span>Ngày tạo</span><strong>{formatDateTime(order.createdAt)}</strong></div>
-      <div><span>Trạng thái</span><StageBadge stage={order.stage} /></div>
+      <div><span>Trạng thái</span><StageBadge order={order} /></div>
       <div><span>Khách hàng</span><strong className="phone-primary">{order.phone}</strong><small>{order.customer}</small></div>
       <div><span>Địa chỉ</span><strong>{order.address || "—"}</strong></div>
     </div>
