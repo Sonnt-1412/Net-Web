@@ -49,6 +49,50 @@ const splitNet = (value: string) => {
   return [parts[0] || "—", parts[1] || "—", parts[2] || "—", parts.slice(3).join(", ") || "—"];
 };
 
+// Bỏ dấu tiếng Việt + chuẩn hoá khoảng trắng/hoa-thường — để so khớp tìm kiếm không
+// phụ thuộc việc gõ đúng dấu.
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+// Khoảng cách Levenshtein giữa 2 chuỗi ngắn — dùng để chấp nhận gõ gần đúng (thiếu/sai vài ký tự).
+function editDistance(a: string, b: string) {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+// Điểm khớp 0..1 giữa từ khoá và 1 đoạn text — không đòi hỏi khớp nguyên cụm hay đúng thứ tự:
+// mỗi từ trong từ khoá được so riêng, chấp nhận khớp một phần và gõ gần đúng (sai/thiếu vài ký
+// tự, ví dụ quên chính xác chữ trong "thông tin lưới") thay vì bắt buộc trùng khớp tuyệt đối.
+function searchScore(query: string, haystack: string) {
+  const words = normalizeText(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return 1;
+  const targets = normalizeText(haystack).split(/\s+/).filter(Boolean);
+  let matched = 0;
+  for (const word of words) {
+    if (targets.some((t) => t.includes(word))) {
+      matched += 1;
+      continue;
+    }
+    const tolerance = word.length <= 3 ? 1 : Math.floor(word.length / 3);
+    if (targets.some((t) => editDistance(word, t) <= tolerance)) matched += 0.6;
+  }
+  return matched / words.length;
+}
+
 function initials(user: AuthUser) {
   const source = user.name || user.email;
   return source.split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase() || "").join("") || "?";
@@ -81,7 +125,8 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   const visibleOrders = useMemo(() => {
     const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
     const toTime = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
-    const keyword = search.toLowerCase().trim();
+    const keyword = search.trim();
+    const scores = new Map<number, number>();
     const filtered = orders.filter((order) => {
       const inTab =
         (activeTab === "orders" && order.stage !== "canceled") ||
@@ -93,9 +138,21 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
       const createdTime = new Date(order.createdAt).getTime();
       if (fromTime !== null && createdTime < fromTime) return false;
       if (toTime !== null && createdTime > toTime) return false;
-      return !keyword || `${order.code} ${order.customer} ${order.phone} ${order.note}`.toLowerCase().includes(keyword);
+      if (!keyword) return true;
+      // Tìm theo mã đơn/khách hàng/SĐT/ghi chú/thông tin lưới (mọi loại lưới của đơn) — khớp
+      // gần đúng, không cần nhớ chính xác chữ.
+      const netText = allNetItems(order).map((item) => item.netInfo).join(" ");
+      const haystack = `${order.code} ${order.customer} ${order.phone} ${order.note} ${netText}`;
+      const score = searchScore(keyword, haystack);
+      if (score <= 0) return false;
+      scores.set(order.id, score);
+      return true;
     });
     return filtered.sort((a, b) => {
+      if (keyword) {
+        const scoreDiff = (scores.get(b.id) || 0) - (scores.get(a.id) || 0);
+        if (scoreDiff) return scoreDiff;
+      }
       if (activeTab === "orders") {
         const position = { production: 0, delivery: 1, payment: 2, canceled: 3 } as const;
         const rank = position[a.stage] - position[b.stage];
@@ -330,7 +387,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
 
         <section className="data-card">
           <div className="table-tools">
-            <div className="search-box"><span>⌕</span><PhoneSuggestInput value={search} onChange={setSearch} suggestions={customers} placeholder="Tìm mã đơn, khách hàng, số điện thoại..." /></div>
+            <div className="search-box"><span>⌕</span><PhoneSuggestInput value={search} onChange={setSearch} suggestions={customers} placeholder="Tìm mã đơn, khách hàng, SĐT, thông tin lưới..." /></div>
             <div className="sync-note"><span>●</span> {activeSection === "sales" ? "Dữ liệu đồng bộ từ Đơn Hàng" : "Khách hàng được nhóm theo số điện thoại"}</div>
           </div>
 
@@ -366,7 +423,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
             </div>
           )}
 
-          {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => !search.trim() || `${customer.name} ${customer.phone}`.toLowerCase().includes(search.toLowerCase()))} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
+          {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => searchScore(search, `${customer.name} ${customer.phone}`) > 0)} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
             {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
             {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
             {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onView={openEdit} />}
