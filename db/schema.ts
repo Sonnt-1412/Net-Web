@@ -56,6 +56,8 @@ export const orders = pgTable("orders", {
   // Các loại lưới #2, #3... của cùng 1 đơn (loại lưới #1 vẫn là netInfo/quantity/unitPrice ở trên).
   // Rỗng ([]) với đơn chỉ có 1 loại lưới — không ảnh hưởng dữ liệu cũ.
   extraItems: jsonb("extra_items").notNull().default(sql`'[]'::jsonb`).$type<NetItem[]>(),
+  // Ghi chú riêng của tab Sản Xuất — khác với `note` (ghi chú gốc mang từ lúc tạo đơn).
+  productionNote: text("production_note").notNull().default(""),
 });
 
 // Thông tin khách hàng "gốc" — được tạo từ đơn hàng đầu tiên của một số điện

@@ -62,7 +62,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [modal, setModal] = useState<"order" | "detail" | "workers" | "customer" | null>(null);
+  const [modal, setModal] = useState<"order" | "workers" | "customer" | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
@@ -213,14 +213,10 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
     }
   };
 
+  // Bấm mã đơn ở bất kỳ tab nào cũng mở đúng modal này — vừa xem đầy đủ thông tin vừa sửa được luôn.
   const openEdit = (id: number) => {
     setEditingId(id);
     setModal("order");
-  };
-
-  const openDetail = (id: number) => {
-    setEditingId(id);
-    setModal("detail");
   };
 
   const cancelOrder = async (id: number) => {
@@ -371,19 +367,16 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
           )}
 
           {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => !search.trim() || `${customer.name} ${customer.phone}`.toLowerCase().includes(search.toLowerCase()))} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
-            {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openDetail} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
-            {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openDetail} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
-            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onView={openDetail} />}
-            {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} onView={openDetail} />}
-            {activeTab === "canceled" && <CanceledTable orders={visibleOrders} onView={openDetail} />}
+            {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
+            {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
+            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onView={openEdit} />}
+            {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} onView={openEdit} />}
+            {activeTab === "canceled" && <CanceledTable orders={visibleOrders} onView={openEdit} />}
           </>}
         </section>
         </>}
       </section>
 
-      {modal === "detail" && currentOrder && (
-        <OrderDetailModal order={currentOrder} onClose={() => setModal(null)} />
-      )}
       {modal === "order" && (
         <OrderModal
           order={currentOrder}
@@ -430,12 +423,12 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
         <WorkersModal
           order={currentOrder}
           onClose={() => setModal(null)}
-          onSave={async (workers) => {
+          onSave={async (workers, productionNote) => {
             try {
-              const updated = await callApi(`/api/orders/${currentOrder.id}`, "PATCH", { workers });
+              const updated = await callApi(`/api/orders/${currentOrder.id}`, "PATCH", { workers, productionNote });
               applyUpdate(currentOrder.id, updated);
               setModal(null);
-              notify("Đã cập nhật người tham gia");
+              notify("Đã cập nhật sản xuất");
             } catch (error) {
               notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
             }
@@ -709,11 +702,12 @@ function ProductionTable({ orders, onEditWorkers, onMove, onView, selectedIds, o
   if (!orders.length) return <Empty />;
   const ids = orders.map((order) => order.id);
   const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
-  return <div className="table-wrap"><table><thead><tr><th className="select-col"><input type="checkbox" checked={allSelected} onChange={() => onToggleAll(ids)} aria-label="Chọn tất cả" /></th><th>Mã đơn</th><th>Thông tin lưới</th><th className="num">SL</th><th>Lượm lưới</th><th>Dập chì</th><th>Cột phao</th><th></th></tr></thead><tbody>
+  return <div className="table-wrap"><table><thead><tr><th className="select-col"><input type="checkbox" checked={allSelected} onChange={() => onToggleAll(ids)} aria-label="Chọn tất cả" /></th><th>Mã đơn</th><th>Thông tin lưới</th><th className="num">SL</th><th>Lượm lưới</th><th>Dập chì</th><th>Cột phao</th><th>Ghi chú</th><th></th></tr></thead><tbody>
     {orders.map((order) => <tr key={order.id} className={selectedIds.has(order.id) ? "row-selected" : undefined}>
       <td className="select-col"><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => onToggle(order.id)} aria-label={`Chọn đơn ${order.code}`} /></td>
       <OrderCodeCell order={order} onView={onView} extra={<small>{order.phone}</small>} /><NetCell order={order} /><QuantityCell order={order} />
       <td><Worker value={order.workers.gather} /></td><td><Worker value={order.workers.lead} /></td><td><Worker value={order.workers.float} /></td>
+      <td className="note-cell">{order.productionNote || "—"}</td>
       <td><div className="row-actions"><button className="link-btn" onClick={() => onEditWorkers(order.id)}>Cập nhật</button><button className="link-btn" onClick={() => exportOrderPdf(order)}>Xuất phiếu</button><button className="compact-primary" onClick={() => onMove(order.id)}>Chuyển giao →</button></div></td>
     </tr>)}
   </tbody></table></div>;
@@ -940,13 +934,29 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions
       <label>Thực thu<input inputMode="numeric" value={formatMoneyInput(form.actual)} onChange={(e) => update("actual", digitsOnly(e.target.value))} placeholder="Bỏ trống = mặc định 0đ" /></label>
       <label className="wide">Ghi chú<input value={form.note} onChange={(e) => update("note", e.target.value)} /></label>
     </div>
+    {/* Bấm mã đơn ở bất kỳ tab nào cũng vào đây — nên ngoài phần sửa được ở trên, hiện thêm
+        thông tin trạng thái/vận hành (chỉ đọc, đổi qua các hành động riêng ở bảng) để xem đầy đủ. */}
+    {order && (
+      <div className="detail-grid">
+        <div><span>Ngày tạo</span><strong>{formatDateTime(order.createdAt)}</strong></div>
+        <div><span>Trạng thái</span><StageBadge order={order} /></div>
+        <div><span>Giao hàng</span><strong>{order.deliveryStatus}</strong></div>
+        <div><span>Thanh toán</span><strong>{order.paymentStatus}</strong>{order.paymentDate && <small>{formatDateTime(order.paymentDate)}</small>}</div>
+        <div><span>Lượm lưới</span><strong>{order.workers.gather || "—"}</strong></div>
+        <div><span>Dập chì</span><strong>{order.workers.lead || "—"}</strong></div>
+        <div><span>Cột phao</span><strong>{order.workers.float || "—"}</strong></div>
+        <div><span>Ghi chú sản xuất</span><strong>{order.productionNote || "—"}</strong></div>
+        {order.stage === "canceled" && <div><span>Lý do hủy</span><strong>{order.cancelReason || "—"}</strong>{order.canceledAt && <small>{formatDateTime(order.canceledAt)}</small>}</div>}
+      </div>
+    )}
     <div className="modal-footer"><p><span>●</span> Thành tiền và Thực thu sẽ đồng bộ sang Nhận Tiền</p><div><button type="button" className="secondary" onClick={onClose} disabled={submitting}>Hủy</button><button className="primary" disabled={submitting}>{submitting ? "Đang lưu…" : order ? "Lưu thay đổi" : "Tạo đơn"}</button></div></div>
   </form></div>;
 }
 
-function WorkersModal({ order, onClose, onSave }: { order: Order; onClose: () => void; onSave: (workers: Order["workers"]) => void }) {
+function WorkersModal({ order, onClose, onSave }: { order: Order; onClose: () => void; onSave: (workers: Order["workers"], productionNote: string) => void }) {
   const [workers, setWorkers] = useState(order.workers);
-  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal small-modal" onMouseDown={(e) => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">SẢN XUẤT · {order.code}</p><h2>Người tham gia công đoạn</h2></div><button className="close" onClick={onClose}>×</button></div><div className="worker-form"><label>Lượm lưới<input value={workers.gather} onChange={(e) => setWorkers({ ...workers, gather: e.target.value })} placeholder="Nhập tên, ngăn cách bằng dấu phẩy" /></label><label>Dập chì<input value={workers.lead} onChange={(e) => setWorkers({ ...workers, lead: e.target.value })} /></label><label>Cột phao<input value={workers.float} onChange={(e) => setWorkers({ ...workers, float: e.target.value })} /></label></div><div className="modal-footer"><p>Mỗi công đoạn chỉ lưu người tham gia.</p><div><button className="secondary" onClick={onClose}>Hủy</button><button className="primary" onClick={() => onSave(workers)}>Lưu người tham gia</button></div></div></div></div>;
+  const [productionNote, setProductionNote] = useState(order.productionNote);
+  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal small-modal" onMouseDown={(e) => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">SẢN XUẤT · {order.code}</p><h2>Người tham gia công đoạn</h2></div><button className="close" onClick={onClose}>×</button></div><div className="worker-form"><label>Lượm lưới<input value={workers.gather} onChange={(e) => setWorkers({ ...workers, gather: e.target.value })} placeholder="Nhập tên, ngăn cách bằng dấu phẩy" /></label><label>Dập chì<input value={workers.lead} onChange={(e) => setWorkers({ ...workers, lead: e.target.value })} /></label><label>Cột phao<input value={workers.float} onChange={(e) => setWorkers({ ...workers, float: e.target.value })} /></label><label>Ghi chú sản xuất<textarea value={productionNote} onChange={(e) => setProductionNote(e.target.value)} placeholder="Ghi chú riêng cho tab Sản Xuất — khác ghi chú gốc của đơn" /></label></div><div className="modal-footer"><p>Ghi chú sản xuất chỉ hiển thị ở tab này.</p><div><button className="secondary" onClick={onClose}>Hủy</button><button className="primary" onClick={() => onSave(workers, productionNote)}>Lưu thay đổi</button></div></div></div></div>;
 }
 
 function CustomerEditModal({ customer, onClose, onSave }: { customer: Customer; onClose: () => void; onSave: (fields: { name: string; address: string }) => void }) {
@@ -964,37 +974,3 @@ function CustomerEditModal({ customer, onClose, onSave }: { customer: Customer; 
 }
 
 // Xem đầy đủ thông tin 1 đơn hàng (chỉ đọc) — mở khi bấm vào mã đơn ở bất kỳ tab nào.
-function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
-  const items = allNetItems(order);
-  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-    <div className="modal-head"><div><p className="eyebrow">CHI TIẾT ĐƠN HÀNG</p><h2>{order.code}</h2></div><button type="button" className="close" onClick={onClose}>×</button></div>
-    <div className="detail-grid">
-      <div><span>Ngày tạo</span><strong>{formatDateTime(order.createdAt)}</strong></div>
-      <div><span>Trạng thái</span><StageBadge order={order} /></div>
-      <div><span>Khách hàng</span><strong className="phone-primary">{order.phone}</strong><small>{order.customer}</small></div>
-      <div><span>Địa chỉ</span><strong>{order.address || "—"}</strong></div>
-    </div>
-    <div className="detail-items">
-      {items.map((item, i) => {
-        const parsed = splitNet(item.netInfo);
-        return <div key={i} className="detail-item">
-          <p className="eyebrow">{items.length > 1 ? `LOẠI LƯỚI ${i + 1}` : "THÔNG TIN LƯỚI"}</p>
-          <div className="parsed-grid">{["Ruột lưới", "Màn", "Phao", "Chì"].map((label, j) => <div key={label}><span>{label}</span><strong>{parsed[j]}</strong></div>)}</div>
-          <div className="detail-item-money"><span>Số lượng: <strong>{item.quantity}</strong></span><span>Đơn giá: <strong>{money(item.unitPrice)}</strong></span></div>
-        </div>;
-      })}
-    </div>
-    <div className="detail-grid">
-      <div><span>Thành tiền</span><strong>{money(order.total)}</strong></div>
-      <div><span>Thực thu</span><strong>{money(order.actual)}</strong></div>
-      <div><span>Giao hàng</span><strong>{order.deliveryStatus}</strong></div>
-      <div><span>Thanh toán</span><strong>{order.paymentStatus}</strong>{order.paymentDate && <small>{formatDateTime(order.paymentDate)}</small>}</div>
-      <div><span>Lượm lưới</span><strong>{order.workers.gather || "—"}</strong></div>
-      <div><span>Dập chì</span><strong>{order.workers.lead || "—"}</strong></div>
-      <div><span>Cột phao</span><strong>{order.workers.float || "—"}</strong></div>
-      <div><span>Ghi chú</span><strong>{order.note || "—"}</strong></div>
-      {order.stage === "canceled" && <div><span>Lý do hủy</span><strong>{order.cancelReason || "—"}</strong>{order.canceledAt && <small>{formatDateTime(order.canceledAt)}</small>}</div>}
-    </div>
-    <div className="modal-footer"><p><span>●</span> Xem đầy đủ thông tin đơn — bấm &quot;Sửa&quot; ở bảng để chỉnh sửa</p><div><button type="button" className="secondary" onClick={onClose}>Đóng</button></div></div>
-  </div></div>;
-}

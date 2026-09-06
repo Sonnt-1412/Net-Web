@@ -26,6 +26,7 @@ export type Order = {
   cancelReason?: string;
   workers: { gather: string; lead: string; float: string };
   extraItems: NetItem[];
+  productionNote: string;
 };
 
 export type Customer = {

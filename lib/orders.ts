@@ -28,6 +28,7 @@ export function toOrder(row: OrderRow): Order {
     cancelReason: row.cancelReason ?? undefined,
     workers: { gather: row.workerGather, lead: row.workerLead, float: row.workerFloat },
     extraItems: row.extraItems ?? [],
+    productionNote: row.productionNote,
   };
 }
 

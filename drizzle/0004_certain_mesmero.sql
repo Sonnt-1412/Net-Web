@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "production_note" text DEFAULT '' NOT NULL;

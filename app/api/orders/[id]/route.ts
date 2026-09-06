@@ -23,6 +23,7 @@ type PatchBody = {
   cancelReason?: string;
   workers?: { gather: string; lead: string; float: string };
   extraItems?: NetItem[];
+  productionNote?: string;
 };
 
 // Loại bỏ dòng thiếu netInfo, ép SL/đơn giá về số hợp lệ.
@@ -61,6 +62,7 @@ function buildUpdate(body: PatchBody) {
     updates.workerFloat = body.workers.float ?? "";
   }
   if (body.extraItems !== undefined) updates.extraItems = sanitizeExtraItems(body.extraItems);
+  if (body.productionNote !== undefined) updates.productionNote = body.productionNote;
   return updates;
 }
 
