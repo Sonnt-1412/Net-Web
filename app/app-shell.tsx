@@ -160,7 +160,12 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
       }
       if (activeTab === "production") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (activeTab === "delivery") {
+        // Chưa giao luôn nằm trên, sort theo thứ tự cũ (id). Trong nhóm Đã giao, đơn vừa
+        // đánh dấu giao hàng gần đây nhất nằm trên cùng, đánh dấu trước đó nằm dưới.
         if (a.deliveryStatus !== b.deliveryStatus) return a.deliveryStatus === "Chưa giao" ? -1 : 1;
+        if (a.deliveryStatus === "Đã giao") {
+          return new Date(b.deliveredAt || b.createdAt).getTime() - new Date(a.deliveredAt || a.createdAt).getTime();
+        }
         return b.id - a.id;
       }
       if (activeTab === "canceled") return new Date(b.canceledAt || b.createdAt).getTime() - new Date(a.canceledAt || a.createdAt).getTime();
@@ -245,9 +250,22 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
       const updated = await callApi(`/api/orders/${id}`, "PATCH", {
         stage: delivered ? "delivery" : "payment",
         deliveryStatus: delivered ? "Chưa giao" : "Đã giao",
+        // Ghi lại lúc đánh dấu đã giao để nhóm "Đã giao" sắp xếp theo — đơn vừa
+        // đánh dấu nằm trên. Bỏ đánh dấu thì xoá lại, không còn coi là đã giao.
+        deliveredAt: delivered ? null : new Date().toISOString(),
       });
       applyUpdate(id, updated);
       notify(delivered ? "Đã chuyển đơn về trạng thái Chưa giao" : "Đã giao hàng — đơn đã xuất hiện ở Nhận Tiền");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    }
+  };
+
+  const moveToProduction = async (id: number) => {
+    try {
+      const updated = await callApi(`/api/orders/${id}`, "PATCH", { stage: "production", deliveryStatus: "Chưa giao", deliveredAt: null });
+      applyUpdate(id, updated);
+      notify("Đã chuyển đơn về Sản Xuất");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Có lỗi xảy ra");
     }
@@ -426,7 +444,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
           {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => searchScore(search, `${customer.name} ${customer.phone}`) > 0)} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
             {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
             {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
-            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onView={openEdit} />}
+            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onMoveToProduction={moveToProduction} onView={openEdit} />}
             {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} onView={openEdit} />}
             {activeTab === "canceled" && <CanceledTable orders={visibleOrders} onView={openEdit} />}
           </>}
@@ -770,10 +788,10 @@ function ProductionTable({ orders, onEditWorkers, onMove, onView, selectedIds, o
   </tbody></table></div>;
 }
 
-function DeliveryTable({ orders, onToggle, onView }: { orders: Order[]; onToggle: (id: number) => void; onView: (id: number) => void }) {
+function DeliveryTable({ orders, onToggle, onMoveToProduction, onView }: { orders: Order[]; onToggle: (id: number) => void; onMoveToProduction: (id: number) => void; onView: (id: number) => void }) {
   if (!orders.length) return <Empty />;
   return <div className="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th className="num">Số lượng</th><th className="num">Thành tiền</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-    {orders.map((order) => <tr key={order.id}><OrderCodeCell order={order} onView={onView} /><CustomerCell name={order.customer} phone={order.phone} /><td>{order.address}</td><QuantityCell order={order} /><td className="num money">{money(order.total)}</td><td><span className={order.deliveryStatus === "Đã giao" ? "badge delivered" : "badge waiting"}>{order.deliveryStatus}</span></td><td><button className={order.deliveryStatus === "Đã giao" ? "secondary compact" : "compact-primary"} onClick={() => onToggle(order.id)}>{order.deliveryStatus === "Đã giao" ? "Chuyển về Chưa giao" : "Đánh dấu đã giao"}</button></td></tr>)}
+    {orders.map((order) => <tr key={order.id}><OrderCodeCell order={order} onView={onView} /><CustomerCell name={order.customer} phone={order.phone} /><td>{order.address}</td><QuantityCell order={order} /><td className="num money">{money(order.total)}</td><td><span className={order.deliveryStatus === "Đã giao" ? "badge delivered" : "badge waiting"}>{order.deliveryStatus}</span></td><td><div className="row-actions"><button className="link-btn" onClick={() => onMoveToProduction(order.id)}>← Về Sản Xuất</button><button className={order.deliveryStatus === "Đã giao" ? "secondary compact" : "compact-primary"} onClick={() => onToggle(order.id)}>{order.deliveryStatus === "Đã giao" ? "Chuyển về Chưa giao" : "Đánh dấu đã giao"}</button></div></td></tr>)}
   </tbody></table></div>;
 }
 

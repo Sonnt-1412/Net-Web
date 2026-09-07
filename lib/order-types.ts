@@ -20,6 +20,7 @@ export type Order = {
   note: string;
   stage: Stage;
   deliveryStatus: "Chưa giao" | "Đã giao";
+  deliveredAt?: string;
   paymentStatus: "Chưa nhận tiền" | "Đã nhận tiền";
   paymentDate?: string;
   canceledAt?: string;

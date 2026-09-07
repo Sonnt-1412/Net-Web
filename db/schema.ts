@@ -46,6 +46,9 @@ export const orders = pgTable("orders", {
   note: text("note").notNull().default(""),
   stage: text("stage").notNull(), // production | delivery | payment | canceled
   deliveryStatus: text("delivery_status").notNull(), // "Chưa giao" | "Đã giao"
+  // Lúc đơn được đánh dấu "Đã giao" — dùng để sắp xếp nhóm đã giao trong tab Đang Giao Hàng
+  // (đơn vừa đánh dấu nằm trên). Null nếu chưa từng đánh dấu, hoặc đã bị chuyển ngược lại.
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   paymentStatus: text("payment_status").notNull(), // "Chưa nhận tiền" | "Đã nhận tiền"
   paymentDate: timestamp("payment_date", { withTimezone: true }),
   canceledAt: timestamp("canceled_at", { withTimezone: true }),

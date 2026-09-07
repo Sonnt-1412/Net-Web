@@ -36,6 +36,13 @@
       "when": 1788658828081,
       "tag": "0004_certain_mesmero",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788748588524,
+      "tag": "0005_talented_exodus",
+      "breakpoints": true
     }
   ]
 }

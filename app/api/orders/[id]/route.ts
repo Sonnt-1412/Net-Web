@@ -17,6 +17,7 @@ type PatchBody = {
   note?: string;
   stage?: string;
   deliveryStatus?: string;
+  deliveredAt?: string | null;
   paymentStatus?: string;
   paymentDate?: string | null;
   canceledAt?: string | null;
@@ -52,6 +53,7 @@ function buildUpdate(body: PatchBody) {
   if (body.note !== undefined) updates.note = body.note;
   if (body.stage !== undefined) updates.stage = body.stage;
   if (body.deliveryStatus !== undefined) updates.deliveryStatus = body.deliveryStatus;
+  if (body.deliveredAt !== undefined) updates.deliveredAt = body.deliveredAt ? new Date(body.deliveredAt) : null;
   if (body.paymentStatus !== undefined) updates.paymentStatus = body.paymentStatus;
   if (body.paymentDate !== undefined) updates.paymentDate = body.paymentDate ? new Date(body.paymentDate) : null;
   if (body.canceledAt !== undefined) updates.canceledAt = body.canceledAt ? new Date(body.canceledAt) : null;

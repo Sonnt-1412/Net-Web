@@ -22,6 +22,7 @@ export function toOrder(row: OrderRow): Order {
     note: row.note,
     stage: row.stage as Order["stage"],
     deliveryStatus: row.deliveryStatus as Order["deliveryStatus"],
+    deliveredAt: row.deliveredAt ? row.deliveredAt.toISOString() : undefined,
     paymentStatus: row.paymentStatus as Order["paymentStatus"],
     paymentDate: row.paymentDate ? row.paymentDate.toISOString() : undefined,
     canceledAt: row.canceledAt ? row.canceledAt.toISOString() : undefined,
