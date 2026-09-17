@@ -644,11 +644,11 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 const productionPdfColumns = [
   { label: "STT", width: 45 },
   { label: "SĐT", width: 175 },
-  { label: "Tên", width: 225 },
+  { label: "Tên", width: 150 },
   { label: "Thông tin lưới", width: 230 },
   { label: "SL", width: 40 },
   { label: "Giá", width: 175 },
-  { label: "Địa chỉ", width: 75 },
+  { label: "Địa chỉ", width: 150 },
   { label: "Ghi chú", width: 76 },
 ];
 
