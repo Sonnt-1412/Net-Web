@@ -642,17 +642,17 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 }
 
 const productionPdfColumns = [
-  { label: "STT", width: 40 },
-  { label: "SĐT", width: 105 },
-  { label: "Tên", width: 100 },
-  { label: "Thông tin lưới", width: 275 },
-  { label: "Số lượng", width: 70 },
-  { label: "Giá", width: 90 },
-  { label: "Địa chỉ", width: 180 },
-  { label: "Ghi chú", width: 181 },
+  { label: "STT", width: 36 },
+  { label: "SĐT", width: 100 },
+  { label: "Tên", width: 82 },
+  { label: "Thông tin lưới", width: 380 },
+  { label: "SL", width: 42 },
+  { label: "Giá", width: 88 },
+  { label: "Địa chỉ", width: 155 },
+  { label: "Ghi chú", width: 158 },
 ];
 
-const productionWorkTemplate = "Lượm: .... , Phao: ...... , Chì: ......";
+const productionWorkTemplate = "Lượm: ............... , Phao: ............... , Chì: ...............";
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
   const lines: string[] = [];
