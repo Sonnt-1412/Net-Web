@@ -392,7 +392,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
             </button>
           )}
           {activeSection === "sales" && activeTab === "production" && (
-            <button className="secondary" onClick={() => exportOrdersExcel(visibleOrders)}>Xuất Excel</button>
+            <button className="secondary" onClick={() => exportProductionPdf(visibleOrders)}>Xuất PDF</button>
           )}
         </div>
 
@@ -641,51 +641,127 @@ function exportHandoverSheet(selectedOrders: Order[]) {
   printWindow.print();
 }
 
-function csvEscape(value: string) {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+const productionPdfColumns = [
+  { label: "STT", width: 60 },
+  { label: "Mã đơn", width: 130 },
+  { label: "SĐT", width: 145 },
+  { label: "Thông tin lưới", width: 375 },
+  { label: "Số lượng", width: 105 },
+  { label: "Giá", width: 145 },
+  { label: "Địa chỉ", width: 285 },
+  { label: "Ghi chú", width: 265 },
+];
+
+function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
+  const lines: string[] = [];
+  for (const paragraph of value.split("\n")) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      lines.push("");
+      continue;
+    }
+    let line = words[0];
+    for (const word of words.slice(1)) {
+      const nextLine = `${line} ${word}`;
+      if (context.measureText(nextLine).width <= maxWidth) line = nextLine;
+      else {
+        lines.push(line);
+        line = word;
+      }
+    }
+    lines.push(line);
+  }
+  return lines;
 }
 
-// Xuất CSV (mở trực tiếp bằng Excel) — không dùng thư viện xlsx vì bản trên npm
-// đang dính lỗ hổng bảo mật chưa vá; CSV không cần thư viện ngoài mà vẫn mở tốt trong Excel.
-function exportOrdersExcel(selectedOrders: Order[]) {
+// Tạo PDF A4 ngang trực tiếp từ danh sách đang hiển thị trong tab Sản Xuất.
+// Nội dung được vẽ lên canvas trước khi đưa vào PDF để giữ nguyên font tiếng Việt.
+async function exportProductionPdf(selectedOrders: Order[]) {
   if (!selectedOrders.length) return;
-  const headers = ["Mã đơn", "Ngày tạo", "Khách hàng", "SĐT", "Địa chỉ", "Thông tin lưới", "Tổng SL", "Thành tiền", "Thực thu", "Trạng thái", "Trạng thái giao hàng", "Trạng thái thanh toán", "Ngày nhận tiền", "Lượm lưới", "Dập chì", "Cột phao", "Ghi chú", "Lý do hủy"];
-  const rows = selectedOrders.map((order) => {
+  const rows = selectedOrders.map((order, index) => {
     const items = allNetItems(order);
-    const netText = items.map((item) => `${item.netInfo} (SL ${item.quantity} × ${money(item.unitPrice)})`).join(" | ");
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     return [
+      String(index + 1),
       order.code,
-      formatDateTime(order.createdAt),
-      order.customer,
       order.phone,
+      items.map((item) => item.netInfo).join("\n"),
+      items.map((item) => String(item.quantity)).join("\n"),
+      items.map((item) => money(item.unitPrice)).join("\n"),
       order.address,
-      netText,
-      String(totalQuantity),
-      String(order.total),
-      order.actual === null ? "" : String(order.actual),
-      stageLabel(order),
-      order.deliveryStatus,
-      order.paymentStatus,
-      order.paymentDate ? formatDateTime(order.paymentDate) : "",
-      order.workers.gather,
-      order.workers.lead,
-      order.workers.float,
-      order.note,
-      order.cancelReason || "",
+      order.note || "—",
     ];
   });
-  // BOM (﻿) để Excel nhận đúng bảng mã UTF-8, không lỗi font tiếng Việt.
-  const csv = "﻿" + [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `don-hang-san-xuat-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+
+  const pageWidth = 1600;
+  const pageHeight = 1131;
+  const margin = 45;
+  const tableTop = 125;
+  const lineHeight = 23;
+  const cellPadding = 10;
+  const pages: HTMLCanvasElement[] = [];
+
+  const createPage = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = pageWidth;
+    canvas.height = pageHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Không thể tạo nội dung PDF.");
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, pageWidth, pageHeight);
+    context.fillStyle = "#172033";
+    context.font = "bold 28px Arial, sans-serif";
+    context.fillText("DANH SÁCH SẢN XUẤT", margin, 48);
+    context.fillStyle = "#596174";
+    context.font = "16px Arial, sans-serif";
+    context.fillText(`Ngày xuất: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length}`, margin, 78);
+
+    let x = margin;
+    context.font = "bold 17px Arial, sans-serif";
+    for (const column of productionPdfColumns) {
+      context.fillStyle = "#e9edf5";
+      context.fillRect(x, tableTop, column.width, 42);
+      context.strokeStyle = "#aeb7c7";
+      context.strokeRect(x, tableTop, column.width, 42);
+      context.fillStyle = "#172033";
+      context.fillText(column.label, x + cellPadding, tableTop + 27);
+      x += column.width;
+    }
+    return { canvas, context, y: tableTop + 42 };
+  };
+
+  let page = createPage();
+  for (const row of rows) {
+    page.context.font = "17px Arial, sans-serif";
+    const cellLines = row.map((value, index) => wrapCanvasText(page.context, value, productionPdfColumns[index].width - cellPadding * 2));
+    const rowHeight = Math.max(44, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
+    if (page.y + rowHeight > pageHeight - margin) {
+      pages.push(page.canvas);
+      page = createPage();
+    }
+
+    let x = margin;
+    cellLines.forEach((lines, index) => {
+      const column = productionPdfColumns[index];
+      page.context.fillStyle = "#ffffff";
+      page.context.fillRect(x, page.y, column.width, rowHeight);
+      page.context.strokeStyle = "#c9cfda";
+      page.context.strokeRect(x, page.y, column.width, rowHeight);
+      page.context.fillStyle = "#202636";
+      lines.forEach((line, lineIndex) => page.context.fillText(line, x + cellPadding, page.y + cellPadding + 17 + lineIndex * lineHeight));
+      x += column.width;
+    });
+    page.y += rowHeight;
+  }
+  pages.push(page.canvas);
+
+  const { jsPDF } = await import("jspdf");
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+  pages.forEach((canvas, index) => {
+    if (index > 0) pdf.addPage("a4", "landscape");
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 297, 210, undefined, "FAST");
+  });
+  pdf.save(`don-hang-san-xuat-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 // Cột "Khách hàng" dùng chung — SĐT hiển thị to/đậm vì đó là thứ cần tra cứu nhanh, tên nhỏ bên dưới.
