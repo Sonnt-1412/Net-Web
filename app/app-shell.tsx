@@ -651,6 +651,8 @@ const productionPdfColumns = [
   { label: "Ghi chú", width: 300 },
 ];
 
+const productionWorkTemplate = "Lượm: .... , Phao: ...... , Chì: ......";
+
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
   const lines: string[] = [];
   for (const paragraph of value.split("\n")) {
@@ -682,7 +684,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     return [
       String(index + 1),
       order.phone,
-      `${items.map((item) => item.netInfo).join("\n")}\nLượm: ............   Phao: ............   Chì: ............`,
+      [...items.map((item) => item.netInfo), productionWorkTemplate].join("\n"),
       items.map((item) => String(item.quantity)).join("\n"),
       items.map((item) => money(item.unitPrice)).join("\n"),
       order.address,
