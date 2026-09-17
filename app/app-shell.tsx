@@ -652,7 +652,7 @@ const productionPdfColumns = [
   { label: "Ghi chú", width: 76 },
 ];
 
-const productionWorkTemplate = "Lượm: ............... , Phao: ............... , Chì: ...............";
+const productionWorkTemplate = "Lượm: ...... , Phao: ...... , Chì: ......";
 const productionPdfSingleLineColumns = new Set([1, 2, 5]);
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
@@ -755,9 +755,14 @@ async function exportProductionPdf(selectedOrders: Order[]) {
   let page = createPage();
   for (const row of rows) {
     page.context.font = "23px Arial, sans-serif";
-    const cellLines = row.map((value, index) => productionPdfSingleLineColumns.has(index)
-      ? value.split("\n")
-      : wrapCanvasText(page.context, value, productionPdfColumns[index].width - cellPadding * 2));
+    const cellLines = row.map((value, index) => {
+      if (productionPdfSingleLineColumns.has(index)) return value.split("\n");
+      const maxWidth = productionPdfColumns[index].width - cellPadding * 2;
+      if (index === 3) return value.split("\n").flatMap((line) => line === productionWorkTemplate
+        ? [line]
+        : wrapCanvasText(page.context, line, maxWidth));
+      return wrapCanvasText(page.context, value, maxWidth);
+    });
     const rowHeight = Math.max(46, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
     if (page.y + rowHeight > pageHeight - margin) {
       pages.push(page.canvas);
@@ -774,6 +779,8 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.fillStyle = "#202636";
       page.context.font = "23px Arial, sans-serif";
       lines.forEach((line, lineIndex) => {
+        const isWorkTemplate = index === 3 && line === productionWorkTemplate;
+        page.context.font = isWorkTemplate ? "13px Arial, sans-serif" : "23px Arial, sans-serif";
         const textX = x + cellPadding;
         const textY = page.y + cellPadding + 23 + lineIndex * lineHeight;
         if (!productionPdfSingleLineColumns.has(index)) {
