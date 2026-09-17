@@ -692,10 +692,10 @@ function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWid
 // Nội dung được vẽ lên canvas trước khi đưa vào PDF để giữ nguyên font tiếng Việt.
 async function exportProductionPdf(selectedOrders: Order[]) {
   if (!selectedOrders.length) return;
-  const rows = selectedOrders.map((order, index) => {
+  const rows = selectedOrders.map((order) => {
     const items = allNetItems(order);
     return [
-      String(index + 1),
+      order.code.split("-")[0],
       order.phone,
       order.customer,
       [...items.map((item) => item.netInfo), productionWorkTemplate].join("\n"),
