@@ -643,13 +643,13 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 
 const productionPdfColumns = [
   { label: "STT", width: 45 },
-  { label: "SĐT", width: 145 },
-  { label: "Tên", width: 180 },
-  { label: "Thông tin lưới", width: 300 },
+  { label: "SĐT", width: 175 },
+  { label: "Tên", width: 225 },
+  { label: "Thông tin lưới", width: 230 },
   { label: "SL", width: 40 },
-  { label: "Giá", width: 145 },
-  { label: "Địa chỉ", width: 90 },
-  { label: "Ghi chú", width: 96 },
+  { label: "Giá", width: 175 },
+  { label: "Địa chỉ", width: 75 },
+  { label: "Ghi chú", width: 76 },
 ];
 
 const productionWorkTemplate = "Lượm: ............... , Phao: ............... , Chì: ...............";
@@ -741,7 +741,12 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       context.strokeRect(x, tableTop, column.width, headerHeight);
       context.fillStyle = "#172033";
       const labelWidth = context.measureText(column.label).width;
-      context.fillText(column.label, x + Math.max(1, (column.width - labelWidth) / 2), tableTop + 36);
+      const labelScale = Math.min(1, (column.width - 4) / labelWidth);
+      context.save();
+      context.translate(x + (column.width - labelWidth * labelScale) / 2, tableTop + 36);
+      context.scale(labelScale, 1);
+      context.fillText(column.label, 0, 0);
+      context.restore();
       x += column.width;
     }
     return { canvas, context, y: tableTop + headerHeight };
