@@ -642,13 +642,14 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 }
 
 const productionPdfColumns = [
-  { label: "STT", width: 45 },
+  { label: "STT", width: 40 },
   { label: "SĐT", width: 105 },
-  { label: "Thông tin lưới", width: 310 },
-  { label: "Số lượng", width: 80 },
-  { label: "Giá", width: 105 },
-  { label: "Địa chỉ", width: 205 },
-  { label: "Ghi chú", width: 191 },
+  { label: "Tên", width: 100 },
+  { label: "Thông tin lưới", width: 275 },
+  { label: "Số lượng", width: 70 },
+  { label: "Giá", width: 90 },
+  { label: "Địa chỉ", width: 180 },
+  { label: "Ghi chú", width: 181 },
 ];
 
 const productionWorkTemplate = "Lượm: .... , Phao: ...... , Chì: ......";
@@ -684,6 +685,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     return [
       String(index + 1),
       order.phone,
+      order.customer,
       [...items.map((item) => item.netInfo), productionWorkTemplate].join("\n"),
       items.map((item) => String(item.quantity)).join("\n"),
       items.map((item) => money(item.unitPrice)).join("\n"),
