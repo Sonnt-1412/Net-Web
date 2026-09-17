@@ -643,13 +643,12 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 
 const productionPdfColumns = [
   { label: "STT", width: 60 },
-  { label: "Mã đơn", width: 130 },
   { label: "SĐT", width: 145 },
-  { label: "Thông tin lưới", width: 375 },
+  { label: "Thông tin lưới", width: 450 },
   { label: "Số lượng", width: 105 },
   { label: "Giá", width: 145 },
-  { label: "Địa chỉ", width: 285 },
-  { label: "Ghi chú", width: 265 },
+  { label: "Địa chỉ", width: 305 },
+  { label: "Ghi chú", width: 300 },
 ];
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
@@ -682,9 +681,8 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     const items = allNetItems(order);
     return [
       String(index + 1),
-      order.code,
       order.phone,
-      items.map((item) => item.netInfo).join("\n"),
+      `${items.map((item) => item.netInfo).join("\n")}\nLượm: ............   Phao: ............   Chì: ............`,
       items.map((item) => String(item.quantity)).join("\n"),
       items.map((item) => money(item.unitPrice)).join("\n"),
       order.address,
