@@ -653,6 +653,7 @@ const productionPdfColumns = [
 ];
 
 const productionWorkTemplate = "Lượm: ...... , Phao: ...... , Chì: ......";
+const productionWorkTemplateFontSize = 11;
 const productionPdfSingleLineColumns = new Set([1, 2, 5]);
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
@@ -779,7 +780,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.fillStyle = "#202636";
       lines.forEach((line, lineIndex) => {
         const isWorkTemplate = index === 3 && line === productionWorkTemplate;
-        const fontSize = isWorkTemplate ? 13 : column.fontSize;
+        const fontSize = isWorkTemplate ? productionWorkTemplateFontSize : column.fontSize;
         page.context.font = `${fontSize}px Arial, sans-serif`;
         const textX = x + cellPadding;
         const textY = page.y + cellPadding + fontSize + lineIndex * lineHeight;
