@@ -642,13 +642,13 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 }
 
 const productionPdfColumns = [
-  { label: "STT", width: 60 },
-  { label: "SĐT", width: 145 },
-  { label: "Thông tin lưới", width: 450 },
-  { label: "Số lượng", width: 105 },
-  { label: "Giá", width: 145 },
-  { label: "Địa chỉ", width: 305 },
-  { label: "Ghi chú", width: 300 },
+  { label: "STT", width: 45 },
+  { label: "SĐT", width: 105 },
+  { label: "Thông tin lưới", width: 310 },
+  { label: "Số lượng", width: 80 },
+  { label: "Giá", width: 105 },
+  { label: "Địa chỉ", width: 205 },
+  { label: "Ghi chú", width: 191 },
 ];
 
 const productionWorkTemplate = "Lượm: .... , Phao: ...... , Chì: ......";
@@ -675,7 +675,7 @@ function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWid
   return lines;
 }
 
-// Tạo PDF A4 ngang trực tiếp từ danh sách đang hiển thị trong tab Sản Xuất.
+// Tạo PDF A4 dọc trực tiếp từ danh sách đang hiển thị trong tab Sản Xuất.
 // Nội dung được vẽ lên canvas trước khi đưa vào PDF để giữ nguyên font tiếng Việt.
 async function exportProductionPdf(selectedOrders: Order[]) {
   if (!selectedOrders.length) return;
@@ -692,12 +692,12 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     ];
   });
 
-  const pageWidth = 1600;
-  const pageHeight = 1131;
+  const pageWidth = 1131;
+  const pageHeight = 1600;
   const margin = 45;
   const tableTop = 125;
-  const lineHeight = 23;
-  const cellPadding = 10;
+  const lineHeight = 21;
+  const cellPadding = 8;
   const pages: HTMLCanvasElement[] = [];
 
   const createPage = () => {
@@ -717,7 +717,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     context.fillText(`Ngày xuất: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length}`, margin, 78);
 
     let x = margin;
-    context.font = "bold 17px Arial, sans-serif";
+    context.font = "bold 15px Arial, sans-serif";
     for (const column of productionPdfColumns) {
       context.fillStyle = "#e9edf5";
       context.fillRect(x, tableTop, column.width, 42);
@@ -732,7 +732,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
 
   let page = createPage();
   for (const row of rows) {
-    page.context.font = "17px Arial, sans-serif";
+    page.context.font = "15px Arial, sans-serif";
     const cellLines = row.map((value, index) => wrapCanvasText(page.context, value, productionPdfColumns[index].width - cellPadding * 2));
     const rowHeight = Math.max(44, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
     if (page.y + rowHeight > pageHeight - margin) {
@@ -748,7 +748,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.strokeStyle = "#c9cfda";
       page.context.strokeRect(x, page.y, column.width, rowHeight);
       page.context.fillStyle = "#202636";
-      lines.forEach((line, lineIndex) => page.context.fillText(line, x + cellPadding, page.y + cellPadding + 17 + lineIndex * lineHeight));
+      lines.forEach((line, lineIndex) => page.context.fillText(line, x + cellPadding, page.y + cellPadding + 15 + lineIndex * lineHeight));
       x += column.width;
     });
     page.y += rowHeight;
@@ -756,10 +756,10 @@ async function exportProductionPdf(selectedOrders: Order[]) {
   pages.push(page.canvas);
 
   const { jsPDF } = await import("jspdf");
-  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   pages.forEach((canvas, index) => {
-    if (index > 0) pdf.addPage("a4", "landscape");
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 297, 210, undefined, "FAST");
+    if (index > 0) pdf.addPage("a4", "portrait");
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 210, 297, undefined, "FAST");
   });
   pdf.save(`don-hang-san-xuat-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
