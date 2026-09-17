@@ -642,14 +642,14 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 }
 
 const productionPdfColumns = [
-  { label: "STT", width: 45 },
-  { label: "SĐT", width: 175 },
-  { label: "Tên", width: 150 },
-  { label: "Thông tin lưới", width: 230 },
-  { label: "SL", width: 40 },
-  { label: "Giá", width: 175 },
-  { label: "Địa chỉ", width: 150 },
-  { label: "Ghi chú", width: 76 },
+  { label: "STT", width: 45, fontSize: 23 },
+  { label: "SĐT", width: 175, fontSize: 23 },
+  { label: "Tên", width: 110, fontSize: 18 },
+  { label: "Thông tin lưới", width: 230, fontSize: 23 },
+  { label: "SL", width: 35, fontSize: 18 },
+  { label: "Giá", width: 120, fontSize: 18 },
+  { label: "Địa chỉ", width: 110, fontSize: 18 },
+  { label: "Ghi chú", width: 216, fontSize: 18 },
 ];
 
 const productionWorkTemplate = "Lượm: ...... , Phao: ...... , Chì: ......";
@@ -733,17 +733,17 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     context.fillText(`Ngày xuất: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length}`, margin, 96);
 
     let x = margin;
-    context.font = "bold 23px Arial, sans-serif";
     for (const column of productionPdfColumns) {
       context.fillStyle = "#e9edf5";
       context.fillRect(x, tableTop, column.width, headerHeight);
       context.strokeStyle = "#aeb7c7";
       context.strokeRect(x, tableTop, column.width, headerHeight);
       context.fillStyle = "#172033";
+      context.font = `bold ${column.fontSize}px Arial, sans-serif`;
       const labelWidth = context.measureText(column.label).width;
       const labelScale = Math.min(1, (column.width - 4) / labelWidth);
       context.save();
-      context.translate(x + (column.width - labelWidth * labelScale) / 2, tableTop + 36);
+      context.translate(x + (column.width - labelWidth * labelScale) / 2, tableTop + (headerHeight + column.fontSize) / 2 - 3);
       context.scale(labelScale, 1);
       context.fillText(column.label, 0, 0);
       context.restore();
@@ -754,8 +754,8 @@ async function exportProductionPdf(selectedOrders: Order[]) {
 
   let page = createPage();
   for (const row of rows) {
-    page.context.font = "23px Arial, sans-serif";
     const cellLines = row.map((value, index) => {
+      page.context.font = `${productionPdfColumns[index].fontSize}px Arial, sans-serif`;
       if (productionPdfSingleLineColumns.has(index)) return value.split("\n");
       const maxWidth = productionPdfColumns[index].width - cellPadding * 2;
       if (index === 3) return value.split("\n").flatMap((line) => line === productionWorkTemplate
@@ -777,12 +777,12 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.strokeStyle = "#c9cfda";
       page.context.strokeRect(x, page.y, column.width, rowHeight);
       page.context.fillStyle = "#202636";
-      page.context.font = "23px Arial, sans-serif";
       lines.forEach((line, lineIndex) => {
         const isWorkTemplate = index === 3 && line === productionWorkTemplate;
-        page.context.font = isWorkTemplate ? "13px Arial, sans-serif" : "23px Arial, sans-serif";
+        const fontSize = isWorkTemplate ? 13 : column.fontSize;
+        page.context.font = `${fontSize}px Arial, sans-serif`;
         const textX = x + cellPadding;
-        const textY = page.y + cellPadding + 23 + lineIndex * lineHeight;
+        const textY = page.y + cellPadding + fontSize + lineIndex * lineHeight;
         if (!productionPdfSingleLineColumns.has(index)) {
           page.context.fillText(line, textX, textY);
           return;
