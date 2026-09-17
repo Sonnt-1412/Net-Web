@@ -642,14 +642,14 @@ function exportHandoverSheet(selectedOrders: Order[]) {
 }
 
 const productionPdfColumns = [
-  { label: "STT", width: 36 },
-  { label: "SĐT", width: 100 },
-  { label: "Tên", width: 82 },
-  { label: "Thông tin lưới", width: 380 },
-  { label: "SL", width: 42 },
-  { label: "Giá", width: 88 },
+  { label: "STT", width: 60 },
+  { label: "SĐT", width: 95 },
+  { label: "Tên", width: 75 },
+  { label: "Thông tin lưới", width: 365 },
+  { label: "SL", width: 50 },
+  { label: "Giá", width: 80 },
   { label: "Địa chỉ", width: 155 },
-  { label: "Ghi chú", width: 158 },
+  { label: "Ghi chú", width: 161 },
 ];
 
 const productionWorkTemplate = "Lượm: ............... , Phao: ............... , Chì: ...............";
@@ -657,7 +657,19 @@ const productionWorkTemplate = "Lượm: ............... , Phao: ...............
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
   const lines: string[] = [];
   for (const paragraph of value.split("\n")) {
-    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    const words = paragraph.trim().split(/\s+/).filter(Boolean).flatMap((word) => {
+      if (context.measureText(word).width <= maxWidth) return [word];
+      const parts: string[] = [];
+      let part = "";
+      for (const character of word) {
+        if (part && context.measureText(part + character).width > maxWidth) {
+          parts.push(part);
+          part = character;
+        } else part += character;
+      }
+      if (part) parts.push(part);
+      return parts;
+    });
     if (!words.length) {
       lines.push("");
       continue;
@@ -697,9 +709,10 @@ async function exportProductionPdf(selectedOrders: Order[]) {
   const pageWidth = 1131;
   const pageHeight = 1600;
   const margin = 45;
-  const tableTop = 125;
-  const lineHeight = 21;
-  const cellPadding = 8;
+  const tableTop = 155;
+  const lineHeight = 40;
+  const cellPadding = 10;
+  const headerHeight = 64;
   const pages: HTMLCanvasElement[] = [];
 
   const createPage = () => {
@@ -712,31 +725,32 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, pageWidth, pageHeight);
     context.fillStyle = "#172033";
-    context.font = "bold 28px Arial, sans-serif";
-    context.fillText("DANH SÁCH SẢN XUẤT", margin, 48);
+    context.font = "bold 48px Arial, sans-serif";
+    context.fillText("DANH SÁCH SẢN XUẤT", margin, 65);
     context.fillStyle = "#596174";
-    context.font = "16px Arial, sans-serif";
-    context.fillText(`Ngày xuất: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length}`, margin, 78);
+    context.font = "28px Arial, sans-serif";
+    context.fillText(`Ngày xuất: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length}`, margin, 110);
 
     let x = margin;
-    context.font = "bold 15px Arial, sans-serif";
+    context.font = "bold 30px Arial, sans-serif";
     for (const column of productionPdfColumns) {
       context.fillStyle = "#e9edf5";
-      context.fillRect(x, tableTop, column.width, 42);
+      context.fillRect(x, tableTop, column.width, headerHeight);
       context.strokeStyle = "#aeb7c7";
-      context.strokeRect(x, tableTop, column.width, 42);
+      context.strokeRect(x, tableTop, column.width, headerHeight);
       context.fillStyle = "#172033";
-      context.fillText(column.label, x + cellPadding, tableTop + 27);
+      const labelWidth = context.measureText(column.label).width;
+      context.fillText(column.label, x + Math.max(3, (column.width - labelWidth) / 2), tableTop + 42);
       x += column.width;
     }
-    return { canvas, context, y: tableTop + 42 };
+    return { canvas, context, y: tableTop + headerHeight };
   };
 
   let page = createPage();
   for (const row of rows) {
-    page.context.font = "15px Arial, sans-serif";
+    page.context.font = "30px Arial, sans-serif";
     const cellLines = row.map((value, index) => wrapCanvasText(page.context, value, productionPdfColumns[index].width - cellPadding * 2));
-    const rowHeight = Math.max(44, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
+    const rowHeight = Math.max(60, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
     if (page.y + rowHeight > pageHeight - margin) {
       pages.push(page.canvas);
       page = createPage();
@@ -750,7 +764,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.strokeStyle = "#c9cfda";
       page.context.strokeRect(x, page.y, column.width, rowHeight);
       page.context.fillStyle = "#202636";
-      lines.forEach((line, lineIndex) => page.context.fillText(line, x + cellPadding, page.y + cellPadding + 15 + lineIndex * lineHeight));
+      lines.forEach((line, lineIndex) => page.context.fillText(line, x + cellPadding, page.y + cellPadding + 30 + lineIndex * lineHeight));
       x += column.width;
     });
     page.y += rowHeight;
