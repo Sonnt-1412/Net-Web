@@ -403,52 +403,52 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
           <Summary label="Chờ nhận tiền" value={orders.filter((o) => o.stage === "payment" && o.paymentStatus === "Chưa nhận tiền").length} tone="green" />
         </div> : <div className="customer-summary"><div><span>Khách hàng</span><strong>{customers.length}</strong></div><p>Nhận diện bằng số điện thoại · Lịch sử đơn được giữ xuyên suốt</p></div>}
 
-        <section className="data-card">
-          <div className="table-tools">
-            <div className="search-box"><span>⌕</span><PhoneSuggestInput value={search} onChange={setSearch} suggestions={customers} placeholder="Tìm mã đơn, khách hàng, SĐT, thông tin lưới..." /></div>
-            <div className="sync-note"><span>●</span> {activeSection === "sales" ? "Dữ liệu đồng bộ từ Đơn Hàng" : "Khách hàng được nhóm theo số điện thoại"}</div>
-          </div>
-
-          {activeSection === "sales" && (
-            <div className="range-bar">
-              <div className="range-filter">
-                <label>Từ ngày tạo<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
-                <label>Đến ngày tạo<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
-                {(dateFrom || dateTo) && <button type="button" className="link-btn" onClick={() => { setDateFrom(""); setDateTo(""); }}>Bỏ lọc ngày</button>}
-              </div>
-              <div className="range-total"><span>{visibleOrders.length} đơn</span><strong>{money(rangeTotal)}</strong></div>
+          <section className="data-card">
+            <div className="table-tools">
+              <div className="search-box"><span>⌕</span><PhoneSuggestInput value={search} onChange={setSearch} suggestions={customers} placeholder="Tìm mã đơn, khách hàng, SĐT, thông tin lưới..." /></div>
+              <div className="sync-note"><span>●</span> {activeSection === "sales" ? "Dữ liệu đồng bộ từ Đơn Hàng" : "Khách hàng được nhóm theo số điện thoại"}</div>
             </div>
-          )}
 
-          {activeSection === "sales" && activeTab === "orders" && selectedOrderIds.size > 0 && (
-            <div className="bulk-bar">
-              <span>{selectedOrderIds.size} đơn được chọn</span>
-              <div>
-                <button className="danger-link" onClick={() => bulkCancelOrders([...selectedOrderIds])}>Hủy các đơn đã chọn</button>
-                <button className="link-btn" onClick={() => setSelectedOrderIds(new Set())}>Bỏ chọn</button>
+            {activeSection === "sales" && (
+              <div className="range-bar">
+                <div className="range-filter">
+                  <label>Từ ngày tạo<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+                  <label>Đến ngày tạo<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
+                  {(dateFrom || dateTo) && <button type="button" className="link-btn" onClick={() => { setDateFrom(""); setDateTo(""); }}>Bỏ lọc ngày</button>}
+                </div>
+                <div className="range-total"><span>{visibleOrders.length} đơn</span><strong>{money(rangeTotal)}</strong></div>
               </div>
-            </div>
-          )}
+            )}
 
-          {activeSection === "sales" && activeTab === "production" && selectedOrderIds.size > 0 && (
-            <div className="bulk-bar">
-              <span>{selectedOrderIds.size} đơn được chọn</span>
-              <div>
-                <button className="secondary compact" onClick={() => bulkPrintOrders([...selectedOrderIds])}>In các phiếu đã chọn</button>
-                <button className="compact-primary" onClick={() => bulkExportHandover([...selectedOrderIds])}>Xuất phiếu bàn giao</button>
-                <button className="link-btn" onClick={() => setSelectedOrderIds(new Set())}>Bỏ chọn</button>
+            {activeSection === "sales" && activeTab === "orders" && selectedOrderIds.size > 0 && (
+              <div className="bulk-bar">
+                <span>{selectedOrderIds.size} đơn được chọn</span>
+                <div>
+                  <button className="danger-link" onClick={() => bulkCancelOrders([...selectedOrderIds])}>Hủy các đơn đã chọn</button>
+                  <button className="link-btn" onClick={() => setSelectedOrderIds(new Set())}>Bỏ chọn</button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => searchScore(search, `${customer.name} ${customer.phone}`) > 0)} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
-            {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
-            {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
-            {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onMoveToProduction={moveToProduction} onView={openEdit} />}
-            {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} onView={openEdit} />}
-            {activeTab === "canceled" && <CanceledTable orders={visibleOrders} onView={openEdit} />}
-          </>}
-        </section>
+            {activeSection === "sales" && activeTab === "production" && selectedOrderIds.size > 0 && (
+              <div className="bulk-bar">
+                <span>{selectedOrderIds.size} đơn được chọn</span>
+                <div>
+                  <button className="secondary compact" onClick={() => bulkPrintOrders([...selectedOrderIds])}>In các phiếu đã chọn</button>
+                  <button className="compact-primary" onClick={() => bulkExportHandover([...selectedOrderIds])}>Xuất phiếu bàn giao</button>
+                  <button className="link-btn" onClick={() => setSelectedOrderIds(new Set())}>Bỏ chọn</button>
+                </div>
+              </div>
+            )}
+
+            {activeSection === "customers" ? <CustomersView customers={customers.filter((customer) => searchScore(search, `${customer.name} ${customer.phone}`) > 0)} selectedPhone={selectedCustomerPhone} onSelect={setSelectedCustomerPhone} onEditOrder={openEdit} onEditCustomer={(phone) => { setSelectedCustomerPhone(phone); setModal("customer"); }} /> : <>
+              {activeTab === "orders" && <OrdersTable orders={visibleOrders} onEdit={openEdit} onCancel={cancelOrder} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
+              {activeTab === "production" && <ProductionTable orders={visibleOrders} onEditWorkers={(id) => { setEditingId(id); setModal("workers"); }} onMove={moveToDelivery} onView={openEdit} selectedIds={selectedOrderIds} onToggle={toggleSelectOrder} onToggleAll={toggleSelectAllOrders} />}
+              {activeTab === "delivery" && <DeliveryTable orders={visibleOrders} onToggle={toggleDelivered} onMoveToProduction={moveToProduction} onView={openEdit} />}
+              {activeTab === "payment" && <PaymentTable orders={visibleOrders} onPaid={togglePaid} onEdit={openEdit} onView={openEdit} />}
+              {activeTab === "canceled" && <CanceledTable orders={visibleOrders} onView={openEdit} />}
+            </>}
+          </section>
         </>}
       </section>
 
@@ -1032,7 +1032,7 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions
   const autoTotal = (quantity: string, unitPrice: string, items: typeof extraItems) =>
     String(
       Number(quantity) * Number(unitPrice) +
-        items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0),
+      items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitPrice), 0),
     ) || "";
 
   const update = (key: keyof typeof form, value: string) => {
