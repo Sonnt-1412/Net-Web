@@ -1006,7 +1006,7 @@ function Worker({ value }: { value: string }) {
 
 function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => Promise<void>; onLookupCustomer: (phone: string) => Promise<Customer | null>; phoneSuggestions: { phone: string; name: string }[] }) {
   const [submitting, setSubmitting] = useState(false);
-  const [createdBy, setCreatedBy] = useState<Order["createdBy"] | "">(order?.createdBy ?? "");
+  const [createdBy, setCreatedBy] = useState<Order["createdBy"]>(order?.createdBy ?? "Ngân");
   const [form, setForm] = useState({
     customer: order?.customer || "",
     phone: order?.phone || "",
