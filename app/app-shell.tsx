@@ -641,19 +641,19 @@ function exportHandoverSheet(selectedOrders: Order[]) {
   printWindow.print();
 }
 
+const productionWorkTemplateFontSize = 14;
 const productionPdfColumns = [
-  { label: "STT", width: 45, fontSize: 23 },
+  { label: "STT", width: 135, fontSize: 23 },
   { label: "SĐT", width: 175, fontSize: 23 },
   { label: "Tên", width: 110, fontSize: 18 },
   { label: "Thông tin lưới", width: 230, fontSize: 23 },
   { label: "SL", width: 35, fontSize: 18 },
   { label: "Giá", width: 120, fontSize: 18 },
   { label: "Địa chỉ", width: 110, fontSize: 18 },
-  { label: "Ghi chú", width: 216, fontSize: 18 },
+  { label: "Ghi chú", width: 126, fontSize: productionWorkTemplateFontSize },
 ];
 
 const productionWorkTemplate = "Lượm: ...... , Phao: ...... , Chì: ......";
-const productionWorkTemplateFontSize = 14;
 const productionPdfSingleLineColumns = new Set([1, 2, 5]);
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
