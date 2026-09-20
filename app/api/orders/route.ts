@@ -37,12 +37,17 @@ export async function POST(request: Request) {
       return Response.json({ error: "Thiếu thông tin bắt buộc." }, { status: 400 });
     }
 
+    if (body.createdBy !== "Ngân" && body.createdBy !== "Hiếu") {
+      return Response.json({ error: "Vui lòng chọn người lên đơn: Ngân hoặc Hiếu." }, { status: 400 });
+    }
+
     const db = getDb();
     const [inserted] = await db
       .insert(orders)
       .values({
         userId: user.id,
         code: "",
+        createdBy: body.createdBy,
         receivedAt: new Intl.DateTimeFormat("vi-VN").format(new Date()),
         customer: body.customer,
         phone: body.phone,

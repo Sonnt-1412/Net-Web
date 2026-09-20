@@ -9,6 +9,7 @@ export function toOrder(row: OrderRow): Order {
   return {
     id: row.id,
     code: row.code,
+    createdBy: row.createdBy,
     receivedAt: row.receivedAt,
     createdAt: row.createdAt.toISOString(),
     customer: row.customer,

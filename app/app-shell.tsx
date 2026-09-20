@@ -641,19 +641,19 @@ function exportHandoverSheet(selectedOrders: Order[]) {
   printWindow.print();
 }
 
-const productionWorkTemplateFontSize = 14;
+const productionNoteFontSize = 14;
 const productionPdfColumns = [
-  { label: "STT", width: 135, fontSize: 23 },
+  { label: "STT", width: 81, fontSize: 23 },
   { label: "SĐT", width: 175, fontSize: 23 },
   { label: "Tên", width: 110, fontSize: 18 },
   { label: "Thông tin lưới", width: 230, fontSize: 23 },
   { label: "SL", width: 35, fontSize: 18 },
   { label: "Giá", width: 120, fontSize: 18 },
   { label: "Địa chỉ", width: 110, fontSize: 18 },
-  { label: "Ghi chú", width: 126, fontSize: productionWorkTemplateFontSize },
+  { label: "Ghi chú", width: 180, fontSize: productionNoteFontSize },
 ];
 
-const productionWorkTemplate = "Lượm: ...... , Phao: ...... , Chì: ......";
+const productionWorkTemplate = "Lượm:\nPhao:\nChì:";
 const productionPdfSingleLineColumns = new Set([1, 2, 5]);
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
@@ -700,11 +700,11 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       order.code.split("-")[0],
       order.phone,
       order.customer,
-      [...items.map((item) => item.netInfo), productionWorkTemplate].join("\n"),
+      items.map((item) => item.netInfo).join("\n"),
       items.map((item) => String(item.quantity)).join("\n"),
       items.map((item) => money(item.unitPrice)).join("\n"),
       order.address,
-      order.note || "—",
+      [order.note.trim(), productionWorkTemplate].filter(Boolean).join("\n"),
     ];
   });
 
@@ -759,9 +759,6 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.font = `${productionPdfColumns[index].fontSize}px Arial, sans-serif`;
       if (productionPdfSingleLineColumns.has(index)) return value.split("\n");
       const maxWidth = productionPdfColumns[index].width - cellPadding * 2;
-      if (index === 3) return value.split("\n").flatMap((line) => line === productionWorkTemplate
-        ? [line]
-        : wrapCanvasText(page.context, line, maxWidth));
       return wrapCanvasText(page.context, value, maxWidth);
     });
     const rowHeight = Math.max(46, Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2);
@@ -779,12 +776,11 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       page.context.strokeRect(x, page.y, column.width, rowHeight);
       page.context.fillStyle = "#202636";
       lines.forEach((line, lineIndex) => {
-        const isWorkTemplate = index === 3 && line === productionWorkTemplate;
-        const fontSize = isWorkTemplate ? productionWorkTemplateFontSize : column.fontSize;
+        const fontSize = column.fontSize;
         page.context.font = `${fontSize}px Arial, sans-serif`;
         const textX = x + cellPadding;
         const textY = page.y + cellPadding + fontSize + lineIndex * lineHeight;
-        const keepOnSingleLine = isWorkTemplate || productionPdfSingleLineColumns.has(index);
+        const keepOnSingleLine = productionPdfSingleLineColumns.has(index);
         if (!keepOnSingleLine) {
           page.context.fillText(line, textX, textY);
           return;
@@ -1010,6 +1006,7 @@ function Worker({ value }: { value: string }) {
 
 function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions }: { order?: Order; onClose: () => void; onSave: (fields: OrderFormFields) => Promise<void>; onLookupCustomer: (phone: string) => Promise<Customer | null>; phoneSuggestions: { phone: string; name: string }[] }) {
   const [submitting, setSubmitting] = useState(false);
+  const [createdBy, setCreatedBy] = useState<Order["createdBy"] | "">(order?.createdBy ?? "");
   const [form, setForm] = useState({
     customer: order?.customer || "",
     phone: order?.phone || "",
@@ -1077,10 +1074,11 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (submitting) return; // tránh bấm nhiều lần tạo trùng đơn khi đang chờ lưu
+    if (submitting || !createdBy) return; // tránh bấm nhiều lần tạo trùng đơn khi đang chờ lưu
     setSubmitting(true);
     try {
       await onSave({
+        createdBy,
         customer: form.customer,
         phone: form.phone,
         address: form.address,
@@ -1100,6 +1098,12 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions
   };
   return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal" onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
     <div className="modal-head"><div><p className="eyebrow">ĐƠN HÀNG GỐC</p><h2>{order ? `Sửa đơn ${order.code}` : "Tạo đơn hàng mới"}</h2></div><button type="button" className="close" onClick={onClose}>×</button></div>
+    {!order && <fieldset className="order-creator">
+      <legend>Người lên đơn</legend>
+      {(["Ngân", "Hiếu"] as const).map((name) => <label key={name}>
+        <input type="radio" name="createdBy" value={name} checked={createdBy === name} onChange={() => setCreatedBy(name)} required />{name}
+      </label>)}
+    </fieldset>}
     <div className="form-grid">
       <label>Số điện thoại<PhoneSuggestInput required value={form.phone} onChange={(value) => update("phone", value)} suggestions={phoneSuggestions} placeholder="Nhập số điện thoại trước để tự điền khách quen" /></label>
       <label>Khách hàng{lookingUp && <em className="lookup-hint"> đang tìm khách hàng…</em>}<input required value={form.customer} onChange={(e) => update("customer", e.target.value)} /></label>
@@ -1140,6 +1144,7 @@ function OrderModal({ order, onClose, onSave, onLookupCustomer, phoneSuggestions
         thông tin trạng thái/vận hành (chỉ đọc, đổi qua các hành động riêng ở bảng) để xem đầy đủ. */}
     {order && (
       <div className="detail-grid">
+        <div><span>Người lên đơn</span><strong>{order.createdBy}</strong></div>
         <div><span>Ngày tạo</span><strong>{formatDateTime(order.createdAt)}</strong></div>
         <div><span>Trạng thái</span><StageBadge order={order} /></div>
         <div><span>Giao hàng</span><strong>{order.deliveryStatus}</strong></div>

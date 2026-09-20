@@ -33,6 +33,7 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   code: text("code").notNull(),
+  createdBy: text("created_by").$type<"Ngân" | "Hiếu">().notNull().default("Ngân"),
   receivedAt: text("received_at").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   customer: text("customer").notNull(),

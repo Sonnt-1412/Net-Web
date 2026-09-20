@@ -191,3 +191,8 @@ tbody tr:nth-child(even):hover { background:#f5f7f4; }
 .phone-suggest-list strong { font-size:14px; }
 .phone-suggest-list small { color:#5c6864; font-size:12px; }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+.order-creator { margin:20px 0 0; padding:12px 16px; border:1px solid var(--line); border-radius:10px; display:flex; gap:24px; }
+.order-creator legend { padding:0 5px; color:#5a6863; font-size:13px; font-weight:800; }
+.order-creator label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.order-creator input { width:18px; height:18px; margin:0; accent-color:var(--green); }

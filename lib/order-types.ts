@@ -10,6 +10,7 @@ export type Order = {
   receivedAt: string;
   createdAt: string;
   customer: string;
+  createdBy: "Ngân" | "Hiếu";
   phone: string;
   address: string;
   netInfo: string;
@@ -38,6 +39,7 @@ export type Customer = {
 
 export type OrderFormFields = {
   customer: string;
+  createdBy: "Ngân" | "Hiếu";
   phone: string;
   address: string;
   netInfo: string;
