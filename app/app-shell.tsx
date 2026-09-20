@@ -645,16 +645,18 @@ const productionNoteFontSize = 14;
 const productionPdfColumns = [
   { label: "STT", width: 81, fontSize: 23 },
   { label: "SĐT", width: 175, fontSize: 23 },
-  { label: "Tên", width: 110, fontSize: 18 },
+  { label: "Tên", width: 85, fontSize: 18 },
   { label: "Thông tin lưới", width: 230, fontSize: 23 },
   { label: "SL", width: 35, fontSize: 18 },
   { label: "Giá", width: 120, fontSize: 18 },
   { label: "Địa chỉ", width: 110, fontSize: 18 },
-  { label: "Ghi chú", width: 180, fontSize: productionNoteFontSize },
+  { label: "Ghi chú", width: 110, fontSize: productionNoteFontSize },
+  { label: "Người lên", width: 43, fontSize: 12 },
+  { label: "Ngày", width: 52, fontSize: 12 },
 ];
 
 const productionWorkTemplate = "Lượm:\nPhao:\nChì:";
-const productionPdfSingleLineColumns = new Set([1, 2, 5]);
+const productionPdfSingleLineColumns = new Set([1, 2, 5, 8, 9]);
 
 function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
   const lines: string[] = [];
@@ -705,6 +707,10 @@ async function exportProductionPdf(selectedOrders: Order[]) {
       items.map((item) => money(item.unitPrice)).join("\n"),
       order.address,
       [order.note.trim(), productionWorkTemplate].filter(Boolean).join("\n"),
+      order.createdBy,
+      new Intl.DateTimeFormat("vi-VN", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+      }).format(new Date(order.createdAt)),
     ];
   });
 
