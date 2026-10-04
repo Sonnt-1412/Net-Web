@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, notExists, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { customers, orders } from "@/db/schema";
 import type { Customer } from "@/lib/order-types";
@@ -14,24 +14,44 @@ function toCustomer(row: CustomerRow): Customer {
 // điện thoại. Idempotent nhờ onConflictDoNothing, có thể gọi lại an toàn.
 async function backfillFromOrders(userId: string) {
   const db = getDb();
-  const rows = await db
-    .select({ phone: orders.phone, customer: orders.customer, address: orders.address })
+  const firstOrders = db
+    .selectDistinctOn([orders.phone], {
+      id: orders.id,
+      userId: orders.userId,
+      phone: orders.phone,
+      name: orders.customer,
+      address: orders.address,
+    })
     .from(orders)
     .where(eq(orders.userId, userId))
-    .orderBy(asc(orders.id));
+    .orderBy(asc(orders.phone), asc(orders.id))
+    .as("first_orders");
 
-  const earliestByPhone = new Map<string, { customer: string; address: string }>();
-  for (const row of rows) {
-    if (!earliestByPhone.has(row.phone)) earliestByPhone.set(row.phone, row);
-  }
-  if (!earliestByPhone.size) return;
+  // Bổ sung toàn bộ hồ sơ còn thiếu trong một truy vấn, thay vì gửi một
+  // INSERT cho từng số điện thoại mỗi lần tải trang hoặc tra khách hàng.
+  const missingProfiles = db
+    .select({
+      userId: firstOrders.userId,
+      phone: firstOrders.phone,
+      name: firstOrders.name,
+      address: firstOrders.address,
+    })
+    .from(firstOrders)
+    .where(
+      notExists(
+        db
+          .select({ id: customers.id })
+          .from(customers)
+          .where(and(eq(customers.userId, firstOrders.userId), eq(customers.phone, firstOrders.phone))),
+      ),
+    )
+    .orderBy(asc(firstOrders.id));
 
-  for (const [phone, info] of earliestByPhone) {
-    await db
-      .insert(customers)
-      .values({ userId, phone, name: info.customer, address: info.address })
-      .onConflictDoNothing({ target: [customers.userId, customers.phone] });
-  }
+  await db.execute(sql`
+    insert into ${customers} ("user_id", "phone", "name", "address")
+    ${missingProfiles.getSQL()}
+    on conflict ("user_id", "phone") do nothing
+  `);
 }
 
 export async function listCustomers(userId: string): Promise<Customer[]> {
