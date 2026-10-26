@@ -110,6 +110,7 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
+  const [productionPdfMenuOpen, setProductionPdfMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -392,7 +393,33 @@ export default function AppShell({ user, initialOrders, initialCustomers }: { us
             </button>
           )}
           {activeSection === "sales" && activeTab === "production" && (
-            <button className="secondary" onClick={() => exportProductionPdf(visibleOrders)}>Xuất PDF</button>
+            <div className="production-export">
+              <button
+                className="secondary"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={productionPdfMenuOpen}
+                onClick={() => setProductionPdfMenuOpen((open) => !open)}
+              >
+                Xuất PDF <span aria-hidden="true">▾</span>
+              </button>
+              {productionPdfMenuOpen && (
+                <div className="production-export-menu" role="menu" aria-label="Chế độ xuất PDF">
+                  <button type="button" role="menuitem" onClick={() => {
+                    setProductionPdfMenuOpen(false);
+                    void exportProductionPdf(visibleOrders);
+                  }}>In bình thường · Tất cả đơn</button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setProductionPdfMenuOpen(false);
+                    void exportProductionPdf(visibleOrders.filter((order) => order.createdBy === "Ngân"), "Ngân");
+                  }}>Theo người lên đơn · Ngân</button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setProductionPdfMenuOpen(false);
+                    void exportProductionPdf(visibleOrders.filter((order) => order.createdBy === "Hiếu"), "Hiếu");
+                  }}>Theo người lên đơn · Hiếu</button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -694,7 +721,7 @@ function wrapCanvasText(context: CanvasRenderingContext2D, value: string, maxWid
 
 // Tạo PDF A4 dọc trực tiếp từ danh sách đang hiển thị trong tab Sản Xuất.
 // Nội dung được vẽ lên canvas trước khi đưa vào PDF để giữ nguyên font tiếng Việt.
-async function exportProductionPdf(selectedOrders: Order[]) {
+async function exportProductionPdf(selectedOrders: Order[], createdBy?: Order["createdBy"]) {
   if (!selectedOrders.length) return;
   const rows = selectedOrders.map((order) => {
     const items = allNetItems(order);
@@ -734,7 +761,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     context.fillRect(0, 0, pageWidth, pageHeight);
     context.fillStyle = "#172033";
     context.font = "bold 36px Arial, sans-serif";
-    context.fillText("DANH SÁCH SẢN XUẤT", margin, 54);
+    context.fillText(createdBy ? `DANH SÁCH SẢN XUẤT · ${createdBy.toLocaleUpperCase("vi-VN")}` : "DANH SÁCH SẢN XUẤT", margin, 54);
     context.fillStyle = "#596174";
     context.font = "23px Arial, sans-serif";
     context.fillText(`Ngày xuất: ${formatDateTime(new Date().toISOString())} · Tổng số đơn: ${selectedOrders.length}`, margin, 96);
@@ -814,7 +841,7 @@ async function exportProductionPdf(selectedOrders: Order[]) {
     if (index > 0) pdf.addPage("a4", "portrait");
     pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 210, 297, undefined, "FAST");
   });
-  pdf.save(`don-hang-san-xuat-${new Date().toISOString().slice(0, 10)}.pdf`);
+  pdf.save(`don-hang-san-xuat${createdBy ? `-${createdBy.toLocaleLowerCase("vi-VN")}` : ""}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 // Cột "Khách hàng" dùng chung — SĐT hiển thị to/đậm vì đó là thứ cần tra cứu nhanh, tên nhỏ bên dưới.

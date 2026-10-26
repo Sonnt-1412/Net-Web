@@ -35,6 +35,11 @@ input,textarea { font-size:15px; }
 .user-chip strong { font-size:14px; }
 .workspace { width:min(1500px,94vw); margin:0 auto; padding:38px 0 64px; }
 .page-heading { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:28px; }
+.production-export { position:relative; }
+.production-export>button span { margin-left:6px; font-size:12px; }
+.production-export-menu { position:absolute; top:calc(100% + 7px); right:0; z-index:30; width:max-content; min-width:255px; padding:5px; border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:0 12px 28px #24392f20; }
+.production-export-menu button { display:block; width:100%; padding:10px 12px; border:0; border-radius:7px; background:transparent; color:var(--ink); text-align:left; font-size:14px; }
+.production-export-menu button:hover,.production-export-menu button:focus-visible { background:#f1f6f2; color:var(--green); outline:0; }
 .eyebrow { margin:0 0 8px; color:var(--green); font-size:13px; font-weight:800; letter-spacing:1.4px; }
 .page-heading h1,.modal-head h2 { margin:0; font-family:Georgia,serif; font-weight:600; letter-spacing:-.7px; }
 .page-heading h1 { font-size:40px; }
